@@ -4,7 +4,7 @@
 -- =====================================================
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS wheredjsplay_news;
+CREATE DATABASE IF NOT EXISTS wheredjsplay_news CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE wheredjsplay_news;
 
 -- =====================================================
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   last_login TIMESTAMP NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Categories table
 CREATE TABLE IF NOT EXISTS categories (
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS categories (
   color VARCHAR(7) DEFAULT '#09afdf',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Articles table
 CREATE TABLE IF NOT EXISTS articles (
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS articles (
   INDEX idx_featured (featured),
   INDEX idx_publish_date (publish_date),
   INDEX idx_views (views)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Newsletter subscribers table
 CREATE TABLE IF NOT EXISTS newsletter_subscribers (
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   name VARCHAR(100),
   subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_email (email)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Site settings table
 CREATE TABLE IF NOT EXISTS site_settings (
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS site_settings (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_setting_key (setting_key)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
 -- Insert Initial Data

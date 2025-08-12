@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const path = require('path'); // Added for path.join
+const fs = require('fs'); // Added for file system operations
 
 const db = require('./config/database');
 const authRoutes = require('./routes/auth');
@@ -34,14 +35,7 @@ db.getConnection((err, connection) => {
 // Security middleware
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
+  contentSecurityPolicy: false, // Disable CSP completely for development
 }));
 
 // Rate limiting
@@ -93,16 +87,57 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Special CORS for static files (images)
+// Special CORS for static files (images) - Apply before static file serving
 app.use('/uploads', (req, res, next) => {
+  console.log('📸 Image request:', req.method, req.url);
+  console.log('📸 Request headers:', req.headers);
+  
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('📸 Handling OPTIONS preflight request');
+    res.status(200).end();
+    return;
+  }
+  
   next();
 });
 
-// Static files
-app.use('/uploads', express.static('uploads'));
+// Static files with debugging
+app.use('/uploads', (req, res, next) => {
+  console.log('📁 Static file request:', req.method, req.url);
+  console.log('📁 File path:', path.join(__dirname, 'uploads', req.url));
+  
+  // Check if file exists
+  const filePath = path.join(__dirname, 'uploads', req.url);
+  if (fs.existsSync(filePath)) {
+    console.log('✅ File exists:', filePath);
+  } else {
+    console.log('❌ File not found:', filePath);
+  }
+  
+  next();
+}, express.static('uploads'));
+
+// Special CORS for public images
+app.use('/images', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
 
 // Serve public images from the frontend directory
 app.use('/images', express.static(path.join(__dirname, '../wheredjsplay-unified/public/images')));
@@ -115,6 +150,56 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV
   });
+});
+
+// Test image serving endpoint
+app.get('/test-image/:filename', (req, res) => {
+  const { filename } = req.params;
+  const imagePath = path.join(__dirname, 'uploads/images/articles', filename);
+  
+  console.log('🧪 Testing image:', filename);
+  console.log('🧪 Full path:', imagePath);
+  
+  if (fs.existsSync(imagePath)) {
+    console.log('✅ Image found, serving...');
+    res.sendFile(imagePath);
+  } else {
+    console.log('❌ Image not found');
+    res.status(404).json({
+      error: true,
+      message: 'Image not found',
+      path: imagePath
+    });
+  }
+});
+
+// List available images endpoint
+app.get('/list-images', (req, res) => {
+  const uploadsDir = path.join(__dirname, 'uploads/images/articles');
+  
+  try {
+    if (fs.existsSync(uploadsDir)) {
+      const files = fs.readdirSync(uploadsDir);
+      res.json({
+        success: true,
+        directory: uploadsDir,
+        files: files,
+        count: files.length
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Uploads directory not found',
+        directory: uploadsDir
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error reading directory',
+      error: error.message
+    });
+  }
 });
 
 // API Routes
