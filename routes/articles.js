@@ -2,6 +2,8 @@ const express = require('express');
 const db = require('../config/database');
 const { auth, authorize } = require('../middleware/auth');
 const { validate, articleSchema, articleUpdateSchema } = require('../utils/validation');
+const { validateAndFormatDate } = require('../utils/datetime');
+const { handleRouteError } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -71,11 +73,7 @@ router.get('/', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get articles error:', error);
-    res.status(500).json({
-      error: true,
-      message: 'Internal server error'
-    });
+    handleRouteError(error, res, 'Get articles');
   }
 });
 
@@ -132,27 +130,7 @@ router.get('/:id', async (req, res) => {
       data: formattedArticle
     });
   } catch (error) {
-    console.error('Get article error:', error);
-    
-    // More specific error handling
-    if (error.code === 'ER_BAD_FIELD_ERROR') {
-      return res.status(400).json({
-        error: true,
-        message: 'Invalid article data'
-      });
-    }
-    
-    if (error.code === 'ER_NO_SUCH_TABLE') {
-      return res.status(500).json({
-        error: true,
-        message: 'Database configuration error'
-      });
-    }
-    
-    res.status(500).json({
-      error: true,
-      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+    handleRouteError(error, res, 'Get single article');
   }
 });
 
@@ -188,6 +166,19 @@ router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleS
       });
     }
 
+    // Handle datetime conversion for publish_date
+    let formattedPublishDate = null;
+    if (publish_date) {
+      try {
+        formattedPublishDate = validateAndFormatDate(publish_date);
+      } catch (error) {
+        return res.status(400).json({
+          error: true,
+          message: error.message
+        });
+      }
+    }
+
     // Create article
     const [result] = await db.promise.execute(`
       INSERT INTO articles (
@@ -198,7 +189,7 @@ router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleS
     `, [
       title, excerpt, content, category_id, req.user.id, image,
       featured ? 1 : 0, status, tags, seo_title, seo_description,
-      publish_date || null
+      formattedPublishDate
     ]);
 
     // Get the created article
@@ -226,11 +217,7 @@ router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleS
       data: formattedArticle
     });
   } catch (error) {
-    console.error('Create article error:', error);
-    res.status(500).json({
-      error: true,
-      message: 'Internal server error'
-    });
+    handleRouteError(error, res, 'Create article');
   }
 });
 
@@ -270,7 +257,20 @@ router.put('/:id', auth, authorize('author', 'editor', 'admin'), validate(articl
     Object.keys(updateData).forEach(key => {
       if (key !== 'id' && updateData[key] !== undefined) {
         updateFields.push(`${key} = ?`);
-        updateParams.push(updateData[key]);
+        
+        // Handle datetime conversion for publish_date
+        if (key === 'publish_date' && updateData[key]) {
+          try {
+            updateParams.push(validateAndFormatDate(updateData[key]));
+          } catch (error) {
+            return res.status(400).json({
+              error: true,
+              message: error.message
+            });
+          }
+        } else {
+          updateParams.push(updateData[key]);
+        }
       }
     });
 
@@ -316,11 +316,7 @@ router.put('/:id', auth, authorize('author', 'editor', 'admin'), validate(articl
       data: formattedArticle
     });
   } catch (error) {
-    console.error('Update article error:', error);
-    res.status(500).json({
-      error: true,
-      message: 'Internal server error'
-    });
+    handleRouteError(error, res, 'Update article');
   }
 });
 

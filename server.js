@@ -38,15 +38,35 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP completely for development
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.'
-  }
-});
-app.use('/api/', limiter);
+// Rate limiting - Disabled by default, can be enabled via env var
+const enableRateLimit = process.env.ENABLE_RATE_LIMIT === 'true'; // Must be explicitly enabled
+
+if (enableRateLimit) {
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // 1000 requests per 15 minutes
+    message: {
+      error: 'Too many requests from this IP, please try again later.'
+    },
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    // Skip rate limiting for certain paths
+    skip: (req) => {
+      // Skip rate limiting for health checks and static files
+      return req.path === '/health' || 
+             req.path.startsWith('/uploads/') || 
+             req.path.startsWith('/images/') ||
+             req.path === '/test-image' ||
+             req.path === '/list-images';
+    }
+  });
+
+  // Apply rate limiting to API routes only
+  app.use('/api/', limiter);
+  console.log('🛡️ Rate limiting enabled: 1000 requests per 15 minutes');
+} else {
+  console.log('✅ Rate limiting disabled by default');
+}
 
 // CORS configuration
 const corsOptions = {
@@ -229,7 +249,35 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  console.error('🚨 Global Error Handler:', err);
+  
+  // Handle specific database errors
+  if (err.code === 'ER_TRUNCATED_WRONG_VALUE') {
+    console.error('📅 Database datetime error:', err.sqlMessage);
+    return res.status(400).json({
+      error: true,
+      message: 'Invalid date format provided',
+      details: process.env.NODE_ENV === 'development' ? err.sqlMessage : undefined
+    });
+  }
+  
+  if (err.code === 'ER_DUP_ENTRY') {
+    console.error('🔑 Database duplicate entry error:', err.sqlMessage);
+    return res.status(409).json({
+      error: true,
+      message: 'Duplicate entry found',
+      details: process.env.NODE_ENV === 'development' ? err.sqlMessage : undefined
+    });
+  }
+  
+  if (err.code && err.code.startsWith('ER_')) {
+    console.error('🗄️ Database error:', err.code, err.sqlMessage);
+    return res.status(500).json({
+      error: true,
+      message: 'Database operation failed',
+      details: process.env.NODE_ENV === 'development' ? err.sqlMessage : undefined
+    });
+  }
   
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
@@ -262,13 +310,38 @@ process.on('SIGINT', () => {
 
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  // Don't exit the process, just log the error
+  console.error('🚨 Uncaught Exception:', error);
+  console.error('📊 Error details:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+    timestamp: new Date().toISOString()
+  });
+  
+  // Log to file if needed (optional)
+  // fs.appendFileSync('error.log', `${new Date().toISOString()} - Uncaught Exception: ${error.stack}\n`);
+  
+  // Don't exit the process, just log the error and continue
+  console.log('🔄 Server continuing to run despite uncaught exception');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit the process, just log the error
+  console.error('🚨 Unhandled Rejection at:', promise);
+  console.error('📊 Rejection reason:', reason);
+  console.error('📊 Error details:', {
+    reason: reason instanceof Error ? {
+      name: reason.name,
+      message: reason.message,
+      stack: reason.stack
+    } : reason,
+    timestamp: new Date().toISOString()
+  });
+  
+  // Log to file if needed (optional)
+  // fs.appendFileSync('error.log', `${new Date().toISOString()} - Unhandled Rejection: ${reason}\n`);
+  
+  // Don't exit the process, just log the error and continue
+  console.log('🔄 Server continuing to run despite unhandled rejection');
 });
 
 module.exports = app;
