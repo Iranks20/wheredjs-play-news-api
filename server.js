@@ -32,11 +32,12 @@ db.getConnection((err, connection) => {
   connection.release();
 });
 
-// Security middleware
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: false, // Disable CSP completely for development
-}));
+// Completely disable security middleware for images
+// app.use(helmet({
+//   crossOriginEmbedderPolicy: false,
+//   crossOriginResourcePolicy: { policy: "cross-origin" },
+//   contentSecurityPolicy: false,
+// }));
 
 // Rate limiting - Disabled by default, can be enabled via env var
 const enableRateLimit = process.env.ENABLE_RATE_LIMIT === 'true'; // Must be explicitly enabled
@@ -88,7 +89,30 @@ if (enableRateLimit) {
 // };
 // app.use(cors(corsOptions));
 
-app.use(cors({ origin: '*' }));
+// Completely unrestricted global CORS - NO restrictions
+app.use((req, res, next) => {
+  // Remove ALL security headers that could block anything
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  
+  // Set completely permissive CORS headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Max-Age', '86400');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
+// Completely disable cors middleware - NO restrictions
+// app.use(cors({ origin: '*' }));
 
 
 // Compression middleware
@@ -114,60 +138,79 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Special CORS for static files (images) - Apply before static file serving
-// Special CORS for static files (images) - Apply before static file serving
+// Completely unrestricted image serving - NO CORS restrictions
 app.use('/uploads', (req, res, next) => {
+  // Remove ALL security headers that could block images
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  
+  // Set permissive CORS headers
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Max-Age', '86400');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  res.header('Access-Control-Allow-Credentials', 'true');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  // Log image requests
+  console.log('📁 Unrestricted image request:', req.method, req.url);
+
   next();
-});
+}, express.static(path.join(__dirname, 'uploads')));
 
-// Serve static files from uploads folder
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-
-// Static files with debugging
-app.use('/uploads', (req, res, next) => {
-  console.log('📁 Static file request:', req.method, req.url);
-  console.log('📁 File path:', path.join(__dirname, 'uploads', req.url));
+// Alternative unrestricted image serving endpoint
+app.use('/images-unrestricted', (req, res, next) => {
+  // Remove ALL security headers that could block images
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
   
-  // Check if file exists
-  const filePath = path.join(__dirname, 'uploads', req.url);
-  if (fs.existsSync(filePath)) {
-    console.log('✅ File exists:', filePath);
-  } else {
-    console.log('❌ File not found:', filePath);
-  }
-  
-  next();
-}, express.static('uploads'));
-
-// Special CORS for public images
-app.use('/images', (req, res, next) => {
+  // Set permissive CORS headers
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Max-Age', '86400');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // Log image requests
+  console.log('📁 Alternative unrestricted image request:', req.method, req.url);
+
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
+
+// Serve public images with open CORS
+app.use('/images', (req, res, next) => {
+  // Set CORS headers for all image requests
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.header('Access-Control-Allow-Headers', '*');
   res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  res.header('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
+  }
+
+  // Log image requests in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📁 Public image request:', req.method, req.url);
   }
   
   next();
-});
-
-// Serve public images from the frontend directory
-app.use('/images', express.static(path.join(__dirname, '../wheredjsplay-unified/public/images')));
+}, express.static(path.join(__dirname, '../wheredjsplay-unified/public/images')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -177,6 +220,93 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV
   });
+});
+
+// Completely unrestricted image proxy - NO restrictions at all
+app.get('/image-proxy/:path(*)', (req, res) => {
+  const imagePath = req.params.path;
+  const fullPath = path.join(__dirname, 'uploads', imagePath);
+  
+  console.log('🖼️ Proxy serving image:', imagePath);
+  console.log('🖼️ Full path:', fullPath);
+  
+  // Remove ALL security headers
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  
+  // Set completely permissive headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  
+  if (fs.existsSync(fullPath)) {
+    console.log('✅ Image found, serving via proxy without restrictions');
+    res.sendFile(fullPath);
+  } else {
+    console.log('❌ Image not found via proxy:', fullPath);
+    res.status(404).json({ error: 'Image not found' });
+  }
+});
+
+// Completely unrestricted direct image serving - NO restrictions at all
+app.get('/uploads/images/articles/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const imagePath = path.join(__dirname, 'uploads/images/articles', filename);
+  
+  console.log('🖼️ Serving image:', filename);
+  console.log('🖼️ Full path:', imagePath);
+  
+  // Remove ALL security headers
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  
+  // Set completely permissive headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  
+  if (fs.existsSync(imagePath)) {
+    console.log('✅ Image found, serving without restrictions');
+    res.sendFile(imagePath);
+  } else {
+    console.log('❌ Image not found:', imagePath);
+    res.status(404).json({ error: 'Image not found', path: imagePath });
+  }
+});
+
+// Alternative unrestricted image serving for specific path
+app.get('/images-unrestricted/images/articles/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const imagePath = path.join(__dirname, 'uploads/images/articles', filename);
+  
+  console.log('🖼️ Alternative serving image:', filename);
+  console.log('🖼️ Full path:', imagePath);
+  
+  // Remove ALL security headers
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  
+  // Set completely permissive headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  
+  if (fs.existsSync(imagePath)) {
+    console.log('✅ Image found, serving via alternative endpoint');
+    res.sendFile(imagePath);
+  } else {
+    console.log('❌ Image not found via alternative endpoint:', imagePath);
+    res.status(404).json({ error: 'Image not found', path: imagePath });
+  }
 });
 
 // Test image serving endpoint
