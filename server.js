@@ -69,24 +69,27 @@ if (enableRateLimit) {
 }
 
 // CORS configuration
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    'http://localhost:5173', 
-    'http://127.0.0.1:5173',
-    'http://localhost:3001',
-    'http://13.60.95.22',
-    'http://13.60.95.22:3001',
-    'http://13.60.95.22:80',
-    'http://13.60.95.22/wdjpnews'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+// const corsOptions = {
+//   origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [
+//     'http://localhost:3000', 
+//     'http://127.0.0.1:3000',
+//     'http://localhost:5173', 
+//     'http://127.0.0.1:5173',
+//     'http://localhost:3001',
+//     'http://13.60.95.22',
+//     'http://13.60.95.22:3001',
+//     'http://13.60.95.22:80',
+//     'http://13.60.95.22/wdjpnews'
+//   ],
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+//   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+//   credentials: true,
+//   optionsSuccessStatus: 200
+// };
+// app.use(cors(corsOptions));
+
+app.use(cors({ origin: '*' }));
+
 
 // Compression middleware
 app.use(compression());
