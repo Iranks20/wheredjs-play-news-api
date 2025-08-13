@@ -115,6 +115,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Special CORS for static files (images) - Apply before static file serving
+// Special CORS for static files (images) - Apply before static file serving
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -132,6 +133,22 @@ app.use('/uploads', (req, res, next) => {
 // Serve static files from uploads folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+
+// Static files with debugging
+app.use('/uploads', (req, res, next) => {
+  console.log('📁 Static file request:', req.method, req.url);
+  console.log('📁 File path:', path.join(__dirname, 'uploads', req.url));
+  
+  // Check if file exists
+  const filePath = path.join(__dirname, 'uploads', req.url);
+  if (fs.existsSync(filePath)) {
+    console.log('✅ File exists:', filePath);
+  } else {
+    console.log('❌ File not found:', filePath);
+  }
+  
+  next();
+}, express.static('uploads'));
 
 // Special CORS for public images
 app.use('/images', (req, res, next) => {
