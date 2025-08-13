@@ -164,31 +164,49 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
-// Alternative unrestricted image serving endpoint
-app.use('/images-unrestricted', (req, res, next) => {
-  // Remove ALL security headers that could block images
+// Alternative unrestricted image serving endpoint - Fixed URL structure
+app.get('/images-unrestricted/*', (req, res) => {
+  const requestedPath = req.params[0]; // Get everything after /images-unrestricted/
+  let actualPath = requestedPath;
+  
+  // If the path starts with /uploads/, remove it to avoid double path
+  if (requestedPath.startsWith('uploads/')) {
+    actualPath = requestedPath;
+  } else if (requestedPath.startsWith('/uploads/')) {
+    actualPath = requestedPath.substring(1); // Remove leading slash
+  }
+  
+  const fullPath = path.join(__dirname, 'uploads', actualPath);
+  
+  console.log('🖼️ Alternative endpoint - Requested:', requestedPath);
+  console.log('🖼️ Alternative endpoint - Actual path:', actualPath);
+  console.log('🖼️ Alternative endpoint - Full path:', fullPath);
+  
+  // Remove ALL security headers
   res.removeHeader('Cross-Origin-Resource-Policy');
   res.removeHeader('Cross-Origin-Embedder-Policy');
   res.removeHeader('Cross-Origin-Opener-Policy');
   
-  // Set permissive CORS headers
+  // Set completely permissive headers
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', '*');
   res.header('Access-Control-Allow-Headers', '*');
-  res.header('Access-Control-Max-Age', '86400');
-  res.header('Cache-Control', 'public, max-age=31536000');
   res.header('Access-Control-Allow-Credentials', 'true');
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  res.header('Cache-Control', 'public, max-age=31536000');
+  
+  if (fs.existsSync(fullPath)) {
+    console.log('✅ Image found via alternative endpoint, serving:', fullPath);
+    res.sendFile(fullPath);
+  } else {
+    console.log('❌ Image not found via alternative endpoint:', fullPath);
+    res.status(404).json({ 
+      error: 'Image not found', 
+      requestedPath,
+      actualPath,
+      fullPath 
+    });
   }
-
-  // Log image requests
-  console.log('📁 Alternative unrestricted image request:', req.method, req.url);
-
-  next();
-}, express.static(path.join(__dirname, 'uploads')));
+});
 
 // Serve public images with open CORS
 app.use('/images', (req, res, next) => {
@@ -280,34 +298,7 @@ app.get('/uploads/images/articles/:filename', (req, res) => {
   }
 });
 
-// Alternative unrestricted image serving for specific path
-app.get('/images-unrestricted/images/articles/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const imagePath = path.join(__dirname, 'uploads/images/articles', filename);
-  
-  console.log('🖼️ Alternative serving image:', filename);
-  console.log('🖼️ Full path:', imagePath);
-  
-  // Remove ALL security headers
-  res.removeHeader('Cross-Origin-Resource-Policy');
-  res.removeHeader('Cross-Origin-Embedder-Policy');
-  res.removeHeader('Cross-Origin-Opener-Policy');
-  
-  // Set completely permissive headers
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', '*');
-  res.header('Access-Control-Allow-Headers', '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Cache-Control', 'public, max-age=31536000');
-  
-  if (fs.existsSync(imagePath)) {
-    console.log('✅ Image found, serving via alternative endpoint');
-    res.sendFile(imagePath);
-  } else {
-    console.log('❌ Image not found via alternative endpoint:', imagePath);
-    res.status(404).json({ error: 'Image not found', path: imagePath });
-  }
-});
+
 
 // Test image serving endpoint
 app.get('/test-image/:filename', (req, res) => {
