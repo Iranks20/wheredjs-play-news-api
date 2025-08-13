@@ -116,39 +116,22 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Special CORS for static files (images) - Apply before static file serving
 app.use('/uploads', (req, res, next) => {
-  console.log('📸 Image request:', req.method, req.url);
-  console.log('📸 Request headers:', req.headers);
-  
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  
+
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('📸 Handling OPTIONS preflight request');
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
-  
+
   next();
 });
 
-// Static files with debugging
-app.use('/uploads', (req, res, next) => {
-  console.log('📁 Static file request:', req.method, req.url);
-  console.log('📁 File path:', path.join(__dirname, 'uploads', req.url));
-  
-  // Check if file exists
-  const filePath = path.join(__dirname, 'uploads', req.url);
-  if (fs.existsSync(filePath)) {
-    console.log('✅ File exists:', filePath);
-  } else {
-    console.log('❌ File not found:', filePath);
-  }
-  
-  next();
-}, express.static('uploads'));
+// Serve static files from uploads folder
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // Special CORS for public images
 app.use('/images', (req, res, next) => {
