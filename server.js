@@ -298,6 +298,35 @@ app.get('/uploads/images/articles/:filename', (req, res) => {
   }
 });
 
+// Avatar image serving - NO restrictions at all
+app.get('/uploads/images/avatars/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const imagePath = path.join(__dirname, 'uploads/images/avatars', filename);
+  
+  console.log('👤 Serving avatar:', filename);
+  console.log('👤 Full path:', imagePath);
+  
+  // Remove ALL security headers
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  
+  // Set completely permissive headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  
+  if (fs.existsSync(imagePath)) {
+    console.log('✅ Avatar found, serving without restrictions');
+    res.sendFile(imagePath);
+  } else {
+    console.log('❌ Avatar not found:', imagePath);
+    res.status(404).json({ error: 'Avatar not found', path: imagePath });
+  }
+});
+
 
 
 // Test image serving endpoint
@@ -321,30 +350,62 @@ app.get('/test-image/:filename', (req, res) => {
   }
 });
 
+// Test avatar serving endpoint
+app.get('/test-avatar/:filename', (req, res) => {
+  const { filename } = req.params;
+  const imagePath = path.join(__dirname, 'uploads/images/avatars', filename);
+  
+  console.log('🧪 Testing avatar:', filename);
+  console.log('🧪 Full path:', imagePath);
+  
+  if (fs.existsSync(imagePath)) {
+    console.log('✅ Avatar found, serving...');
+    res.sendFile(imagePath);
+  } else {
+    console.log('❌ Avatar not found');
+    res.status(404).json({
+      error: true,
+      message: 'Avatar not found',
+      path: imagePath
+    });
+  }
+});
+
 // List available images endpoint
 app.get('/list-images', (req, res) => {
-  const uploadsDir = path.join(__dirname, 'uploads/images/articles');
+  const articlesDir = path.join(__dirname, 'uploads/images/articles');
+  const avatarsDir = path.join(__dirname, 'uploads/images/avatars');
   
   try {
-    if (fs.existsSync(uploadsDir)) {
-      const files = fs.readdirSync(uploadsDir);
-      res.json({
-        success: true,
-        directory: uploadsDir,
-        files: files,
-        count: files.length
-      });
-    } else {
-      res.json({
-        success: false,
-        message: 'Uploads directory not found',
-        directory: uploadsDir
-      });
+    const result = {
+      success: true,
+      articles: {
+        directory: articlesDir,
+        files: [],
+        count: 0
+      },
+      avatars: {
+        directory: avatarsDir,
+        files: [],
+        count: 0
+      }
+    };
+    
+    if (fs.existsSync(articlesDir)) {
+      result.articles.files = fs.readdirSync(articlesDir);
+      result.articles.count = result.articles.files.length;
     }
+    
+    if (fs.existsSync(avatarsDir)) {
+      result.avatars.files = fs.readdirSync(avatarsDir);
+      result.avatars.count = result.avatars.files.length;
+    }
+    
+    res.json(result);
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error reading directory',
+      message: 'Error reading directories',
       error: error.message
     });
   }
