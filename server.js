@@ -78,7 +78,7 @@ if (enableRateLimit) {
 //     'http://127.0.0.1:5173',
 //     'http://localhost:3001',
 //     'http://13.60.95.22',
-//     'http://13.60.95.22:3001',
+//     'http://localhost:3001',
 //     'http://13.60.95.22:80',
 //     'http://13.60.95.22/wdjpnews'
 //   ],

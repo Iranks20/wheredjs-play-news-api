@@ -45,14 +45,17 @@ const userSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
   role: Joi.string().valid('author', 'editor', 'admin').default('author'),
-  status: Joi.string().valid('active', 'inactive').default('active')
+  status: Joi.string().valid('active', 'inactive').default('active'),
+  avatar: Joi.string().optional()
 });
 
 const userUpdateSchema = Joi.object({
   name: Joi.string().min(2).max(100).optional(),
   email: Joi.string().email().optional(),
+  password: Joi.string().min(6).optional(),
   role: Joi.string().valid('author', 'editor', 'admin').optional(),
-  status: Joi.string().valid('active', 'inactive').optional()
+  status: Joi.string().valid('active', 'inactive').optional(),
+  avatar: Joi.string().optional()
 });
 
 // Auth validation schemas

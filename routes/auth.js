@@ -7,6 +7,20 @@ const { validate, loginSchema, registerSchema } = require('../utils/validation')
 
 const router = express.Router();
 
+// Helper function to convert relative avatar URL to full URL
+const getFullAvatarUrl = (avatar, req) => {
+  if (!avatar) return null;
+  
+  // If it's already a full URL, return as is
+  if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+    return avatar;
+  }
+  
+  // Convert relative path to full URL
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  return `${baseUrl}${avatar}`;
+};
+
 // JWT Secret with fallback
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_wheredjsplay_2024_change_in_production';
 console.log('JWT_SECRET loaded:', JWT_SECRET ? 'Yes' : 'No', 'Length:', JWT_SECRET?.length);
@@ -64,14 +78,20 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    // Remove password from response
+    // Remove password from response and format user data
     const { password: _, ...userWithoutPassword } = user;
+    const formattedUser = {
+      ...userWithoutPassword,
+      avatar: getFullAvatarUrl(user.avatar, req),
+      created_at: user.created_at.toISOString(),
+      last_login: user.last_login ? user.last_login.toISOString() : null
+    };
 
     res.json({
       error: false,
       message: 'Login successful',
       data: {
-        user: userWithoutPassword,
+        user: formattedUser,
         token
       }
     });
@@ -150,7 +170,7 @@ router.post('/register', validate(registerSchema), async (req, res) => {
 router.get('/me', auth, async (req, res) => {
   try {
     const [users] = await db.promise.execute(
-      'SELECT id, name, email, role, status, created_at, last_login FROM users WHERE id = ?',
+      'SELECT id, name, email, role, status, avatar, created_at, last_login FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -161,9 +181,17 @@ router.get('/me', auth, async (req, res) => {
       });
     }
 
+    const user = users[0];
+    const formattedUser = {
+      ...user,
+      avatar: getFullAvatarUrl(user.avatar, req),
+      created_at: user.created_at.toISOString(),
+      last_login: user.last_login ? user.last_login.toISOString() : null
+    };
+
     res.json({
       error: false,
-      data: users[0]
+      data: formattedUser
     });
   } catch (error) {
     console.error('Get user error:', error);

@@ -6,6 +6,20 @@ const { validate, userSchema, userUpdateSchema } = require('../utils/validation'
 
 const router = express.Router();
 
+// Helper function to convert relative avatar URL to full URL
+const getFullAvatarUrl = (avatar, req) => {
+  if (!avatar) return null;
+  
+  // If it's already a full URL, return as is
+  if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+    return avatar;
+  }
+  
+  // Convert relative path to full URL
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  return `${baseUrl}${avatar}`;
+};
+
 // @route   GET /api/v1/users
 // @desc    Get all users
 // @access  Private (Admin)
@@ -37,7 +51,7 @@ router.get('/', auth, authorize('admin'), async (req, res) => {
     // Get users
     const usersQuery = `
       SELECT 
-        u.id, u.name, u.email, u.role, u.status, u.created_at, u.last_login,
+        u.id, u.name, u.email, u.role, u.status, u.avatar, u.created_at, u.last_login,
         COUNT(a.id) as article_count
       FROM users u
       LEFT JOIN articles a ON u.id = a.author_id
@@ -51,6 +65,7 @@ router.get('/', auth, authorize('admin'), async (req, res) => {
     // Format users
     const formattedUsers = users.map(user => ({
       ...user,
+      avatar: getFullAvatarUrl(user.avatar, req),
       created_at: user.created_at.toISOString(),
       last_login: user.last_login ? user.last_login.toISOString() : null
     }));
@@ -93,7 +108,7 @@ router.get('/:id', auth, async (req, res) => {
 
     const [users] = await db.promise.execute(`
       SELECT 
-        u.id, u.name, u.email, u.role, u.status, u.created_at, u.last_login,
+        u.id, u.name, u.email, u.role, u.status, u.avatar, u.created_at, u.last_login,
         COUNT(a.id) as article_count
       FROM users u
       LEFT JOIN articles a ON u.id = a.author_id
@@ -111,6 +126,7 @@ router.get('/:id', auth, async (req, res) => {
     const user = users[0];
     const formattedUser = {
       ...user,
+      avatar: getFullAvatarUrl(user.avatar, req),
       created_at: user.created_at.toISOString(),
       last_login: user.last_login ? user.last_login.toISOString() : null
     };
@@ -133,7 +149,7 @@ router.get('/:id', auth, async (req, res) => {
 // @access  Private (Admin)
 router.post('/', auth, authorize('admin'), validate(userSchema), async (req, res) => {
   try {
-    const { name, email, password, role = 'author', status = 'active' } = req.body;
+    const { name, email, password, role = 'author', status = 'active', avatar } = req.body;
 
     // Check if user already exists
     const [existingUsers] = await db.promise.execute(
@@ -154,13 +170,13 @@ router.post('/', auth, authorize('admin'), validate(userSchema), async (req, res
 
     // Create user
     const [result] = await db.promise.execute(`
-      INSERT INTO users (name, email, password, role, status, created_at)
-      VALUES (?, ?, ?, ?, ?, NOW())
-    `, [name, email, hashedPassword, role, status]);
+      INSERT INTO users (name, email, password, role, status, avatar, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, NOW())
+    `, [name, email, hashedPassword, role, status, avatar || null]);
 
     // Get the created user
     const [newUser] = await db.promise.execute(`
-      SELECT id, name, email, role, status, created_at
+      SELECT id, name, email, role, status, avatar, created_at
       FROM users WHERE id = ?
     `, [result.insertId]);
 
@@ -169,6 +185,7 @@ router.post('/', auth, authorize('admin'), validate(userSchema), async (req, res
       message: 'User created successfully',
       data: {
         ...newUser[0],
+        avatar: getFullAvatarUrl(newUser[0].avatar, req),
         created_at: newUser[0].created_at.toISOString()
       }
     });
@@ -247,12 +264,13 @@ router.put('/:id', auth, validate(userUpdateSchema), async (req, res) => {
 
     // Get updated user
     const [updatedUser] = await db.promise.execute(`
-      SELECT id, name, email, role, status, created_at, updated_at
+      SELECT id, name, email, role, status, avatar, created_at, updated_at
       FROM users WHERE id = ?
     `, [id]);
 
     const formattedUser = {
       ...updatedUser[0],
+      avatar: getFullAvatarUrl(updatedUser[0].avatar, req),
       created_at: updatedUser[0].created_at.toISOString(),
       updated_at: updatedUser[0].updated_at ? updatedUser[0].updated_at.toISOString() : null
     };
