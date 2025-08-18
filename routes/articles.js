@@ -55,6 +55,8 @@ router.get('/', async (req, res) => {
     const formattedArticles = articles.map(article => ({
       ...article,
       featured: Boolean(article.featured),
+      is_breaking_news: Boolean(article.is_breaking_news || false),
+      is_latest_headline: Boolean(article.is_latest_headline || false),
       created_at: article.created_at.toISOString(),
       updated_at: article.updated_at ? article.updated_at.toISOString() : null,
       publish_date: article.publish_date ? article.publish_date.toISOString() : null
@@ -74,6 +76,135 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     handleRouteError(error, res, 'Get articles');
+  }
+});
+
+// @route   GET /api/v1/articles/featured
+// @desc    Get featured articles
+// @access  Public
+router.get('/featured', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+
+    const [articles] = await db.promise.execute(`
+      SELECT 
+        a.*,
+        c.name as category_name,
+        c.slug as category_slug,
+        u.name as author_name
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.featured = 1 AND a.status = 'published'
+      ORDER BY a.publish_date DESC
+      LIMIT 5
+    `);
+
+    const formattedArticles = articles.map(article => ({
+      ...article,
+      featured: Boolean(article.featured),
+      created_at: article.created_at.toISOString(),
+      publish_date: article.publish_date ? article.publish_date.toISOString() : null
+    }));
+
+    res.json({
+      error: false,
+      data: formattedArticles
+    });
+  } catch (error) {
+    console.error('Get featured articles error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   GET /api/v1/articles/breaking-news
+// @desc    Get breaking news articles
+// @access  Public
+router.get('/breaking-news', async (req, res) => {
+  try {
+    console.log('Breaking news request - query:', req.query);
+    const limit = parseInt(req.query.limit) || 6;
+    console.log('Parsed limit:', limit, 'Type:', typeof limit);
+
+    const [articles] = await db.promise.execute(`
+      SELECT 
+        a.*,
+        c.name as category_name,
+        c.slug as category_slug,
+        u.name as author_name
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.is_breaking_news = 1 AND a.status = 'published'
+      ORDER BY a.created_at DESC
+      LIMIT 6
+    `);
+
+    const formattedArticles = articles.map(article => ({
+      ...article,
+      featured: Boolean(article.featured),
+      is_breaking_news: Boolean(article.is_breaking_news),
+      is_latest_headline: Boolean(article.is_latest_headline || false),
+      created_at: article.created_at ? article.created_at.toISOString() : null,
+      publish_date: article.publish_date ? article.publish_date.toISOString() : null
+    }));
+
+    res.json({
+      error: false,
+      data: formattedArticles
+    });
+  } catch (error) {
+    console.error('Get breaking news error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   GET /api/v1/articles/latest-headlines
+// @desc    Get latest headline articles
+// @access  Public
+router.get('/latest-headlines', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 8;
+
+    const [articles] = await db.promise.execute(`
+      SELECT 
+        a.*,
+        c.name as category_name,
+        c.slug as category_slug,
+        u.name as author_name
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.is_latest_headline = 1 AND a.status = 'published'
+      ORDER BY a.created_at DESC
+      LIMIT 8
+    `);
+
+    const formattedArticles = articles.map(article => ({
+      ...article,
+      featured: Boolean(article.featured),
+      is_breaking_news: Boolean(article.is_breaking_news || false),
+      is_latest_headline: Boolean(article.is_latest_headline),
+      created_at: article.created_at ? article.created_at.toISOString() : null,
+      publish_date: article.publish_date ? article.publish_date.toISOString() : null
+    }));
+
+    res.json({
+      error: false,
+      data: formattedArticles
+    });
+  } catch (error) {
+    console.error('Get latest headlines error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
   }
 });
 
@@ -461,40 +592,113 @@ router.post('/:id/feature', auth, authorize('editor', 'admin'), async (req, res)
   }
 });
 
-// @route   GET /api/v1/articles/featured
-// @desc    Get featured articles
-// @access  Public
-router.get('/featured', async (req, res) => {
+// @route   POST /api/v1/articles/:id/breaking-news
+// @desc    Toggle article breaking news status
+// @access  Private (Editor, Admin)
+router.post('/:id/breaking-news', auth, authorize('editor', 'admin'), async (req, res) => {
   try {
-    const { limit = 5 } = req.query;
+    const { id } = req.params;
 
-    const [articles] = await db.promise.execute(`
-      SELECT 
-        a.*,
-        c.name as category_name,
-        c.slug as category_slug,
-        u.name as author_name
-      FROM articles a
-      LEFT JOIN categories c ON a.category_id = c.id
-      LEFT JOIN users u ON a.author_id = u.id
-      WHERE a.featured = 1 AND a.status = 'published'
-      ORDER BY a.publish_date DESC
-      LIMIT ?
-    `, [parseInt(limit)]);
+    // Check if is_breaking_news column exists
+    const [columns] = await db.promise.execute(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = 'wheredjsplay_news' 
+      AND TABLE_NAME = 'articles' 
+      AND COLUMN_NAME = 'is_breaking_news'
+    `);
 
-    const formattedArticles = articles.map(article => ({
-      ...article,
-      featured: Boolean(article.featured),
-      created_at: article.created_at.toISOString(),
-      publish_date: article.publish_date ? article.publish_date.toISOString() : null
-    }));
+    if (columns.length === 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Breaking news functionality not available. Please run database migration first.'
+      });
+    }
+
+    // Get current breaking news status
+    const [articles] = await db.promise.execute(
+      'SELECT is_breaking_news FROM articles WHERE id = ?',
+      [id]
+    );
+
+    if (articles.length === 0) {
+      return res.status(404).json({
+        error: true,
+        message: 'Article not found'
+      });
+    }
+
+    const newBreakingNewsStatus = !articles[0].is_breaking_news;
+
+    await db.promise.execute(
+      'UPDATE articles SET is_breaking_news = ? WHERE id = ?',
+      [newBreakingNewsStatus ? 1 : 0, id]
+    );
 
     res.json({
       error: false,
-      data: formattedArticles
+      message: `Article ${newBreakingNewsStatus ? 'added to' : 'removed from'} breaking news successfully`,
+      data: { is_breaking_news: newBreakingNewsStatus }
     });
   } catch (error) {
-    console.error('Get featured articles error:', error);
+    console.error('Toggle breaking news error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   POST /api/v1/articles/:id/latest-headline
+// @desc    Toggle article latest headline status
+// @access  Private (Editor, Admin)
+router.post('/:id/latest-headline', auth, authorize('editor', 'admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if is_latest_headline column exists
+    const [columns] = await db.promise.execute(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = 'wheredjsplay_news' 
+      AND TABLE_NAME = 'articles' 
+      AND COLUMN_NAME = 'is_latest_headline'
+    `);
+
+    if (columns.length === 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Latest headlines functionality not available. Please run database migration first.'
+      });
+    }
+
+    // Get current latest headline status
+    const [articles] = await db.promise.execute(
+      'SELECT is_latest_headline FROM articles WHERE id = ?',
+      [id]
+    );
+
+    if (articles.length === 0) {
+      return res.status(404).json({
+        error: true,
+        message: 'Article not found'
+      });
+    }
+
+    const newLatestHeadlineStatus = !articles[0].is_latest_headline;
+
+    await db.promise.execute(
+      'UPDATE articles SET is_latest_headline = ? WHERE id = ?',
+      [newLatestHeadlineStatus ? 1 : 0, id]
+    );
+
+    res.json({
+      error: false,
+      message: `Article ${newLatestHeadlineStatus ? 'added to' : 'removed from'} latest headlines successfully`,
+      data: { is_latest_headline: newLatestHeadlineStatus }
+    });
+  } catch (error) {
+    console.error('Toggle latest headline error:', error);
     res.status(500).json({
       error: true,
       message: 'Internal server error'

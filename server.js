@@ -76,9 +76,9 @@ if (enableRateLimit) {
 //     'http://127.0.0.1:3000',
 //     'http://localhost:5173', 
 //     'http://127.0.0.1:5173',
-//     'http://13.60.95.22:3001',
+//     'http://localhost:3001',
 //     'http://13.60.95.22',
-//     'http://13.60.95.22:3001',
+//     'http://localhost:3001',
 //     'http://13.60.95.22:80',
 //     'http://13.60.95.22/wdjpnews'
 //   ],
@@ -125,6 +125,11 @@ app.use(morgan('combined'));
 app.use(express.json({ 
   limit: '50mb',
   verify: (req, res, buf) => {
+    // Skip verification for empty bodies
+    if (!buf || buf.length === 0) {
+      return;
+    }
+    
     try {
       JSON.parse(buf);
     } catch (e) {
