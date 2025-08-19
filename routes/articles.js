@@ -4,6 +4,7 @@ const { auth, authorize } = require('../middleware/auth');
 const { validate, articleSchema, articleUpdateSchema } = require('../utils/validation');
 const { validateAndFormatDate } = require('../utils/datetime');
 const { handleRouteError } = require('../utils/errorHandler');
+const { validateAndProcessMedia, detectMediaType } = require('../utils/mediaUtils');
 
 const router = express.Router();
 
@@ -276,6 +277,8 @@ router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleS
       content,
       category_id,
       image,
+      embedded_media,
+      media_type = 'image',
       featured = false,
       status = 'draft',
       tags,
@@ -310,15 +313,45 @@ router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleS
       }
     }
 
+    // Handle embedded media validation and mutual exclusivity
+    let processedMedia = null;
+    let finalMediaType = media_type;
+    let finalImage = image;
+    
+    if (embedded_media && embedded_media.trim()) {
+      // Auto-detect media type if not specified
+      if (media_type === 'image') {
+        finalMediaType = detectMediaType(embedded_media) || 'image';
+      }
+      
+      // Validate and process the media URL
+      processedMedia = validateAndProcessMedia(embedded_media, finalMediaType);
+      
+      if (!processedMedia) {
+        return res.status(400).json({
+          error: true,
+          message: `Invalid ${finalMediaType} URL format`
+        });
+      }
+      
+      // Clear image when embedded media is provided
+      finalImage = null;
+    } else if (image && image.trim()) {
+      // Clear embedded media when image is provided
+      finalMediaType = 'image';
+    }
+
     // Create article
     const [result] = await db.promise.execute(`
       INSERT INTO articles (
         title, excerpt, content, category_id, author_id, image, 
-        featured, status, tags, seo_title, seo_description, 
+        embedded_media, media_type, featured, status, tags, seo_title, seo_description, 
         publish_date, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `, [
-      title, excerpt, content, category_id, req.user.id, image,
+      title, excerpt, content, category_id, req.user.id, finalImage,
+      processedMedia ? processedMedia.originalUrl : null,
+      finalMediaType,
       featured ? 1 : 0, status, tags, seo_title, seo_description,
       formattedPublishDate
     ]);
@@ -379,6 +412,38 @@ router.put('/:id', auth, authorize('author', 'editor', 'admin'), validate(articl
         error: true,
         message: 'You can only edit your own articles'
       });
+    }
+
+    // Handle embedded media validation and mutual exclusivity
+    if (updateData.embedded_media && updateData.embedded_media.trim()) {
+      const mediaType = updateData.media_type || 'image';
+      let finalMediaType = mediaType;
+      
+      // Auto-detect media type if not specified
+      if (mediaType === 'image') {
+        finalMediaType = detectMediaType(updateData.embedded_media) || 'image';
+      }
+      
+      // Validate and process the media URL
+      const processedMedia = validateAndProcessMedia(updateData.embedded_media, finalMediaType);
+      
+      if (!processedMedia) {
+        return res.status(400).json({
+          error: true,
+          message: `Invalid ${finalMediaType} URL format`
+        });
+      }
+      
+      // Update the data with processed values
+      updateData.embedded_media = processedMedia.originalUrl;
+      updateData.media_type = finalMediaType;
+      
+      // Clear image when embedded media is provided
+      updateData.image = null;
+    } else if (updateData.image && updateData.image.trim()) {
+      // Clear embedded media when image is provided
+      updateData.embedded_media = null;
+      updateData.media_type = 'image';
     }
 
     // Build update query

@@ -7,12 +7,14 @@ const articleSchema = Joi.object({
   content: Joi.string().min(100).required(),
   category_id: Joi.number().integer().positive().required(),
   author_id: Joi.number().integer().positive().required(),
-  image: Joi.string().optional(),
+  image: Joi.string().allow('', null).optional(),
+  embedded_media: Joi.string().uri().allow('', null).optional(),
+  media_type: Joi.string().valid('image', 'spotify', 'youtube', 'soundcloud').default('image'),
   featured: Joi.boolean().default(false),
   status: Joi.string().valid('draft', 'pending', 'published').default('draft'),
-  tags: Joi.string().optional(),
-  seo_title: Joi.string().max(60).optional(),
-  seo_description: Joi.string().max(160).optional(),
+  tags: Joi.string().allow('', null).optional(),
+  seo_title: Joi.string().max(60).allow('', null).optional(),
+  seo_description: Joi.string().max(160).allow('', null).optional(),
   publish_date: Joi.date().allow(null).optional()
 });
 
@@ -22,12 +24,14 @@ const articleUpdateSchema = Joi.object({
   content: Joi.string().min(100).optional(),
   category_id: Joi.number().integer().positive().optional(),
   author_id: Joi.number().integer().positive().optional(),
-  image: Joi.string().optional(),
+  image: Joi.string().allow('', null).optional(),
+  embedded_media: Joi.string().uri().allow('', null).optional(),
+  media_type: Joi.string().valid('image', 'spotify', 'youtube', 'soundcloud').optional(),
   featured: Joi.boolean().optional(),
   status: Joi.string().valid('draft', 'pending', 'published').optional(),
-  tags: Joi.string().optional(),
-  seo_title: Joi.string().max(60).optional(),
-  seo_description: Joi.string().max(160).optional(),
+  tags: Joi.string().allow('', null).optional(),
+  seo_title: Joi.string().max(60).allow('', null).optional(),
+  seo_description: Joi.string().max(160).allow('', null).optional(),
   publish_date: Joi.date().allow(null).optional()
 });
 

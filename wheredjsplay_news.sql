@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `category_id` int NOT NULL,
   `author_id` int NOT NULL,
   `image` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `embedded_media` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `media_type` enum('image','spotify','youtube','soundcloud') COLLATE utf8mb4_unicode_ci DEFAULT 'image',
   `featured` tinyint(1) DEFAULT '0',
   `is_breaking_news` tinyint(1) DEFAULT '0',
   `is_latest_headline` tinyint(1) DEFAULT '0',
