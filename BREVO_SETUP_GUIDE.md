@@ -56,7 +56,7 @@ const brevoConfig = {
   apiKey: process.env.BREVO_API_KEY || 'your_brevo_api_key_here',
   senderEmail: process.env.BREVO_SENDER_EMAIL || 'noreply@wheredjsplay.com',
   senderName: process.env.BREVO_SENDER_NAME || 'WhereDJsPlay Team',
-  frontendUrl: process.env.FRONTEND_URL || 'http://54.243.89.55/wdjpnews',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   // ... other settings
 };
 ```
