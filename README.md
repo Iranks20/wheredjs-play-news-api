@@ -37,13 +37,24 @@ A complete Node.js REST API for the WhereDJsPlay news platform, built with Expre
    cp env.example .env
    ```
    
-   Edit `.env` file with your database credentials:
+   Edit `.env` file with your credentials:
    ```env
+   # Database Configuration
    DB_HOST=localhost
    DB_USER=root
    DB_PASSWORD=your_password
    DB_NAME=wheredjsplay_news
+   
+   # JWT Configuration
    JWT_SECRET=your_super_secret_jwt_key_here
+   
+   # Email Configuration (Brevo)
+   BREVO_API_KEY=your_brevo_api_key
+   BREVO_SENDER_EMAIL=your_verified_sender_email
+   BREVO_SENDER_NAME=wheredjsplay
+   
+   # Frontend URL
+   FRONTEND_URL=http://your-frontend-url.com
    ```
 
 4. **Set up the database**
@@ -52,7 +63,12 @@ A complete Node.js REST API for the WhereDJsPlay news platform, built with Expre
    npm run seed
    ```
 
-5. **Start the server**
+5. **Test email configuration**
+   ```bash
+   node test-email.js
+   ```
+
+6. **Start the server**
    ```bash
    # Development mode
    npm run dev

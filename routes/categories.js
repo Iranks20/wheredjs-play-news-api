@@ -260,9 +260,9 @@ router.get('/:id/articles', async (req, res) => {
       LEFT JOIN users u ON a.author_id = u.id
       WHERE a.category_id = ? ${status !== 'all' ? 'AND a.status = ?' : ''}
       ORDER BY a.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;
-    const articlesParams = status !== 'all' ? [id, status, parseInt(limit), offset] : [id, parseInt(limit), offset];
+    const articlesParams = status !== 'all' ? [id, status] : [id];
     const [articles] = await db.promise.execute(articlesQuery, articlesParams);
 
     // Format articles

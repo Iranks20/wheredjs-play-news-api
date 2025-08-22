@@ -35,8 +35,8 @@ router.get('/', async (req, res) => {
 
 // @route   PUT /api/v1/settings
 // @desc    Update site settings
-// @access  Private (Admin)
-router.put('/', auth, authorize('admin'), async (req, res) => {
+// @access  Private (Admin, Editor)
+router.put('/', auth, authorize('admin', 'editor'), async (req, res) => {
   try {
     const settings = req.body;
 

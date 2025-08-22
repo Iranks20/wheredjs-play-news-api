@@ -18,6 +18,8 @@ const analyticsRoutes = require('./routes/analytics');
 const newsletterRoutes = require('./routes/newsletter');
 const searchRoutes = require('./routes/search');
 const settingsRoutes = require('./routes/settings');
+const subscribersRoutes = require('./routes/subscribers');
+const { startScheduler } = require('./utils/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -428,6 +430,7 @@ app.use(`${API_PREFIX}/analytics`, analyticsRoutes);
 app.use(`${API_PREFIX}/newsletter`, newsletterRoutes);
 app.use(`${API_PREFIX}/search`, searchRoutes);
 app.use(`${API_PREFIX}/settings`, settingsRoutes);
+app.use(`${API_PREFIX}/subscribers`, subscribersRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -485,6 +488,9 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 API Base URL: http://localhost:${PORT}${API_PREFIX}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+  
+  // Start the article scheduler
+  startScheduler();
 });
 
 // Graceful shutdown

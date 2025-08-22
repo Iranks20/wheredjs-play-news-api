@@ -59,10 +59,10 @@ router.get('/articles', validateQuery(searchSchema), async (req, res) => {
       LEFT JOIN users u ON a.author_id = u.id
       ${whereClause}
       ORDER BY a.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;
 
-    const [articles] = await db.promise.execute(articlesQuery, [...params, parseInt(limit), offset]);
+    const [articles] = await db.promise.execute(articlesQuery, params);
 
     // Format articles
     const formattedArticles = articles.map(article => ({

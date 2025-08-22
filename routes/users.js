@@ -1,10 +1,54 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const db = require('../config/database');
 const { auth, authorize } = require('../middleware/auth');
 const { validate, userSchema, userUpdateSchema } = require('../utils/validation');
+const bcrypt = require('bcryptjs');
+const { sendUserInvitationEmail } = require('../config/email');
 
 const router = express.Router();
+
+// Helper function to generate secure random password
+function generateSecurePassword() {
+  const length = 12;
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let password = '';
+  
+  // Ensure at least one character from each category
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // uppercase
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // number
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // special char
+  
+  // Fill the rest randomly
+  for (let i = 4; i < length; i++) {
+    password += charset[Math.floor(Math.random() * charset.length)];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+// Helper function to send invitation email
+async function sendInvitationEmail(email, name, password, role) {
+  console.log('📧 Starting invitation email process...');
+  
+  try {
+    console.log('📧 Attempting to send email via Brevo...');
+    
+    // Send email using Brevo
+    const result = await sendUserInvitationEmail(email, name, password, role);
+    
+    console.log('✅ Invitation email sent successfully via Brevo:', {
+      messageId: result.messageId,
+      response: result.response
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to send invitation email:', error.message);
+    throw new Error(`Failed to send invitation email: ${error.message}`);
+  }
+}
 
 // Helper function to convert relative avatar URL to full URL
 const getFullAvatarUrl = (avatar, req) => {
@@ -22,8 +66,8 @@ const getFullAvatarUrl = (avatar, req) => {
 
 // @route   GET /api/v1/users
 // @desc    Get all users
-// @access  Private (Admin)
-router.get('/', auth, authorize('admin'), async (req, res) => {
+// @access  Private (Admin, Editor)
+router.get('/', auth, authorize('admin', 'editor'), async (req, res) => {
   try {
     const { page = 1, limit = 10, role, status } = req.query;
     const offset = (page - 1) * limit;
@@ -84,6 +128,44 @@ router.get('/', auth, authorize('admin'), async (req, res) => {
     });
   } catch (error) {
     console.error('Get users error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   GET /api/v1/users/authors
+// @desc    Get all authors (for article creation)
+// @access  Private (Admin, Editor, Author, Writer)
+router.get('/authors', auth, authorize('admin', 'editor', 'author', 'writer'), async (req, res) => {
+  try {
+    const [users] = await db.promise.execute(`
+      SELECT 
+        u.id, u.name, u.email, u.role, u.status, u.avatar, u.created_at,
+        COUNT(a.id) as article_count
+      FROM users u
+      LEFT JOIN articles a ON u.id = a.author_id
+      WHERE u.role IN ('author', 'editor', 'admin', 'writer') AND u.status = 'active'
+      GROUP BY u.id
+      ORDER BY u.name ASC
+    `);
+
+    // Format users
+    const formattedUsers = users.map(user => ({
+      ...user,
+      avatar: getFullAvatarUrl(user.avatar, req),
+      created_at: user.created_at.toISOString()
+    }));
+
+    res.json({
+      error: false,
+      data: {
+        users: formattedUsers
+      }
+    });
+  } catch (error) {
+    console.error('Get authors error:', error);
     res.status(500).json({
       error: true,
       message: 'Internal server error'
@@ -191,6 +273,100 @@ router.post('/', auth, authorize('admin'), validate(userSchema), async (req, res
     });
   } catch (error) {
     console.error('Create user error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   POST /api/v1/users/invite
+// @desc    Invite a new user (Editor, Admin)
+// @access  Private (Editor, Admin)
+router.post('/invite', auth, authorize('editor', 'admin'), async (req, res) => {
+  try {
+    const { name, email, role = 'writer' } = req.body;
+
+    // Validate required fields
+    if (!name || !email) {
+      return res.status(400).json({
+        error: true,
+        message: 'Name and email are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid email format'
+      });
+    }
+
+    // Check if user already exists
+    const [existingUsers] = await db.promise.execute(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(409).json({
+        error: true,
+        message: 'User with this email already exists'
+      });
+    }
+
+    // Generate a secure random password
+    const password = generateSecurePassword();
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create the user
+    const [result] = await db.promise.execute(
+      'INSERT INTO users (name, email, password, role, status, created_at) VALUES (?, ?, ?, ?, "active", NOW())',
+      [name, email, hashedPassword, role]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(500).json({
+        error: true,
+        message: 'Failed to create user'
+      });
+    }
+
+    const userId = result.insertId;
+
+    // Send invitation email
+    try {
+      console.log('📧 Sending invitation email to:', email);
+      await sendInvitationEmail(email, name, password, role);
+      console.log('✅ Invitation email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Failed to send invitation email:', {
+        error: emailError.message,
+        code: emailError.code,
+        stack: emailError.stack
+      });
+      
+      // Don't fail the request if email fails, but log it
+      // You might want to add this to a retry queue
+      console.log('⚠️ User created but email failed. User can still login with the generated password.');
+    }
+
+    res.status(201).json({
+      error: false,
+      message: 'User invited successfully',
+      data: {
+        id: userId,
+        name,
+        email,
+        role,
+        status: 'active'
+      }
+    });
+
+  } catch (error) {
+    console.error('Invite user error:', error);
     res.status(500).json({
       error: true,
       message: 'Internal server error'
@@ -410,9 +586,9 @@ router.get('/:id/articles', async (req, res) => {
       LEFT JOIN users u ON a.author_id = u.id
       WHERE a.author_id = ? ${status !== 'all' ? 'AND a.status = ?' : ''}
       ORDER BY a.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;
-    const articlesParams = status !== 'all' ? [id, status, parseInt(limit), offset] : [id, parseInt(limit), offset];
+    const articlesParams = status !== 'all' ? [id, status] : [id];
     const [articles] = await db.promise.execute(articlesQuery, articlesParams);
 
     // Format articles

@@ -9,7 +9,7 @@ const articleSchema = Joi.object({
   author_id: Joi.number().integer().positive().required(),
   image: Joi.string().allow('', null).optional(),
   embedded_media: Joi.string().uri().allow('', null).optional(),
-  media_type: Joi.string().valid('image', 'spotify', 'youtube', 'soundcloud').default('image'),
+  media_type: Joi.string().valid('image', 'spotify', 'youtube', 'soundcloud', 'beatport').default('image'),
   featured: Joi.boolean().default(false),
   status: Joi.string().valid('draft', 'pending', 'published').default('draft'),
   tags: Joi.string().allow('', null).optional(),
@@ -26,7 +26,7 @@ const articleUpdateSchema = Joi.object({
   author_id: Joi.number().integer().positive().optional(),
   image: Joi.string().allow('', null).optional(),
   embedded_media: Joi.string().uri().allow('', null).optional(),
-  media_type: Joi.string().valid('image', 'spotify', 'youtube', 'soundcloud').optional(),
+  media_type: Joi.string().valid('image', 'spotify', 'youtube', 'soundcloud', 'beatport').optional(),
   featured: Joi.boolean().optional(),
   status: Joi.string().valid('draft', 'pending', 'published').optional(),
   tags: Joi.string().allow('', null).optional(),
@@ -48,7 +48,7 @@ const userSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
-  role: Joi.string().valid('author', 'editor', 'admin').default('author'),
+  role: Joi.string().valid('author', 'editor', 'admin', 'writer').default('author'),
   status: Joi.string().valid('active', 'inactive').default('active'),
   avatar: Joi.string().optional()
 });
@@ -57,7 +57,7 @@ const userUpdateSchema = Joi.object({
   name: Joi.string().min(2).max(100).optional(),
   email: Joi.string().email().optional(),
   password: Joi.string().min(6).optional(),
-  role: Joi.string().valid('author', 'editor', 'admin').optional(),
+  role: Joi.string().valid('author', 'editor', 'admin', 'writer').optional(),
   status: Joi.string().valid('active', 'inactive').optional(),
   avatar: Joi.string().optional()
 });
@@ -72,7 +72,7 @@ const registerSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
-  role: Joi.string().valid('author', 'editor', 'admin').default('author')
+  role: Joi.string().valid('author', 'editor', 'admin', 'writer').default('author')
 });
 
 // Newsletter validation

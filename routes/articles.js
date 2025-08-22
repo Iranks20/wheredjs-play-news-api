@@ -268,8 +268,8 @@ router.get('/:id', async (req, res) => {
 
 // @route   POST /api/v1/articles
 // @desc    Create new article
-// @access  Private (Author, Editor, Admin)
-router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleSchema), async (req, res) => {
+// @access  Private (Author, Editor, Admin, Writer)
+router.post('/', auth, authorize('author', 'editor', 'admin', 'writer'), validate(articleSchema), async (req, res) => {
   try {
     const {
       title,
@@ -387,8 +387,8 @@ router.post('/', auth, authorize('author', 'editor', 'admin'), validate(articleS
 
 // @route   PUT /api/v1/articles/:id
 // @desc    Update article
-// @access  Private (Author, Editor, Admin)
-router.put('/:id', auth, authorize('author', 'editor', 'admin'), validate(articleUpdateSchema), async (req, res) => {
+// @access  Private (Author, Editor, Admin, Writer)
+router.put('/:id', auth, authorize('author', 'editor', 'admin', 'writer'), validate(articleUpdateSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -406,8 +406,8 @@ router.put('/:id', auth, authorize('author', 'editor', 'admin'), validate(articl
       });
     }
 
-    // Check permissions (author can only edit their own articles unless they're admin/editor)
-    if (req.user.role === 'author' && articles[0].author_id !== req.user.id) {
+    // Check permissions (author/writer can only edit their own articles unless they're admin/editor)
+    if ((req.user.role === 'author' || req.user.role === 'writer') && articles[0].author_id !== req.user.id) {
       return res.status(403).json({
         error: true,
         message: 'You can only edit your own articles'
@@ -559,6 +559,31 @@ router.post('/:id/publish', auth, authorize('editor', 'admin'), async (req, res)
   try {
     const { id } = req.params;
 
+    // Check if article has a future publish_date
+    const [articles] = await db.promise.execute(
+      'SELECT publish_date FROM articles WHERE id = ?',
+      [id]
+    );
+
+    if (articles.length === 0) {
+      return res.status(404).json({
+        error: true,
+        message: 'Article not found'
+      });
+    }
+
+    const article = articles[0];
+    const now = new Date();
+    const publishDate = article.publish_date ? new Date(article.publish_date) : null;
+
+    // If article has a future publish_date, don't publish immediately
+    if (publishDate && publishDate > now) {
+      return res.status(400).json({
+        error: true,
+        message: 'Article is scheduled for future publication. It will be published automatically at the scheduled time.'
+      });
+    }
+
     const [result] = await db.promise.execute(
       'UPDATE articles SET status = "published", publish_date = NOW() WHERE id = ?',
       [id]
@@ -577,6 +602,57 @@ router.post('/:id/publish', auth, authorize('editor', 'admin'), async (req, res)
     });
   } catch (error) {
     console.error('Publish article error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// @route   POST /api/v1/articles/:id/schedule
+// @desc    Schedule article for future publication
+// @access  Private (Editor, Admin, Author)
+router.post('/:id/schedule', auth, authorize('editor', 'admin', 'author'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { publish_date } = req.body;
+
+    if (!publish_date) {
+      return res.status(400).json({
+        error: true,
+        message: 'Publish date is required'
+      });
+    }
+
+    const scheduledDate = new Date(publish_date);
+    const now = new Date();
+
+    if (scheduledDate <= now) {
+      return res.status(400).json({
+        error: true,
+        message: 'Publish date must be in the future'
+      });
+    }
+
+    const [result] = await db.promise.execute(
+      'UPDATE articles SET status = "draft", publish_date = ? WHERE id = ?',
+      [scheduledDate, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        error: true,
+        message: 'Article not found'
+      });
+    }
+
+    res.json({
+      error: false,
+      message: 'Article scheduled successfully',
+      data: { publish_date: scheduledDate.toISOString() }
+    });
+  } catch (error) {
+    console.error('Schedule article error:', error);
     res.status(500).json({
       error: true,
       message: 'Internal server error'
