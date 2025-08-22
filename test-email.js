@@ -1,42 +1,32 @@
-// Simple Email Test Script
-// Tests the cleaned-up Brevo email configuration
+// Test script to test email functionality
+require('dotenv').config();
 
 const { sendUserInvitationEmail } = require('./config/email');
 
 async function testEmail() {
-  console.log('🧪 Testing Brevo Email Configuration...\n');
-
-  const testEmail = 'test@example.com';
-  const testName = 'Test User';
-  const testPassword = 'test123456';
-  const testRole = 'writer';
-
-  console.log('📧 Test Parameters:');
-  console.log('To:', testEmail);
-  console.log('Name:', testName);
-  console.log('Role:', testRole);
-  console.log('Password:', testPassword);
-
+  console.log('🧪 Testing Email Functionality');
+  console.log('==============================');
+  
   try {
-    console.log('\n📧 Sending test invitation email...');
+    console.log('📧 Attempting to send test invitation email...');
     
     const result = await sendUserInvitationEmail(
-      testEmail,
-      testName,
-      testPassword,
-      testRole
+      'test@example.com',
+      'Test User',
+      'testpassword123',
+      'writer'
     );
-
-    console.log('\n🎉 SUCCESS! Email sent successfully');
+    
+    console.log('✅ Email sent successfully!');
     console.log('Message ID:', result.messageId);
-    console.log('Response:', result.response);
-
+    console.log('Response:', result);
+    
   } catch (error) {
-    console.error('\n❌ FAILED to send email');
+    console.error('❌ Email test failed:');
     console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
   }
-
-  console.log('\n✅ Email test completed');
 }
 
-testEmail().catch(console.error);
+// Run the test
+testEmail();

@@ -10,9 +10,22 @@ const brevoConfig = {
   senderName: process.env.BREVO_SENDER_NAME || 'wheredjsplay'
 };
 
+// Debug logging to check environment variables
+console.log('🔧 Email Configuration Debug:');
+console.log('BREVO_API_KEY loaded:', brevoConfig.apiKey ? 'Yes' : 'No');
+console.log('BREVO_API_KEY length:', brevoConfig.apiKey ? brevoConfig.apiKey.length : 0);
+console.log('BREVO_SENDER_EMAIL:', brevoConfig.senderEmail);
+console.log('BREVO_SENDER_NAME:', brevoConfig.senderName);
+
 // Send email using Brevo API
 async function sendEmailViaBrevo(toEmail, toName, subject, htmlContent, textContent = null) {
   return new Promise((resolve, reject) => {
+    // Validate API key before proceeding
+    if (!brevoConfig.apiKey) {
+      reject(new Error('BREVO_API_KEY environment variable is not set. Please check your .env file.'));
+      return;
+    }
+    
     const emailData = {
       sender: {
         name: brevoConfig.senderName,

@@ -237,6 +237,6 @@ FRONTEND_URL=http://localhost:3000
 # Other configurations...
 UPLOAD_PATH=./uploads
 MAX_FILE_SIZE=5242880
-CORS_ORIGIN=http://localhost:3000,http://13.60.95.22:3001,http://localhost:5173
+CORS_ORIGIN=http://localhost:3000,http://localhost:3001,http://localhost:5173
 API_PREFIX=/api/v1
 ```
