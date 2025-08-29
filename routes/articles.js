@@ -216,6 +216,9 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Check if the parameter is a number (ID) or string (slug)
+    const isNumeric = !isNaN(id) && !isNaN(parseFloat(id));
+    
     const [articles] = await db.promise.execute(`
       SELECT 
         a.*,
@@ -227,7 +230,7 @@ router.get('/:id', async (req, res) => {
       FROM articles a
       LEFT JOIN categories c ON a.category_id = c.id
       LEFT JOIN users u ON a.author_id = u.id
-      WHERE a.id = ?
+      WHERE ${isNumeric ? 'a.id = ?' : 'a.slug = ?'}
     `, [id]);
 
     if (articles.length === 0) {
@@ -242,11 +245,43 @@ router.get('/:id', async (req, res) => {
     // Increment view count if article is published
     if (article.status === 'published') {
       await db.promise.execute(
-        'UPDATE articles SET views = views + 1 WHERE id = ?',
+        `UPDATE articles SET views = views + 1 WHERE ${isNumeric ? 'id = ?' : 'slug = ?'}`,
         [id]
       );
       article.views += 1;
     }
+
+    // Get related articles from the same category (max 3)
+    const [relatedArticles] = await db.promise.execute(`
+      SELECT 
+        a.id,
+        a.title,
+        a.excerpt,
+        a.image,
+        a.embedded_media,
+        a.media_type,
+        a.slug,
+        a.created_at,
+        a.views,
+        c.name as category_name,
+        c.slug as category_slug,
+        u.name as author_name
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.category_id = ? 
+        AND a.id != ? 
+        AND a.status = 'published'
+      ORDER BY a.created_at DESC
+      LIMIT 3
+    `, [article.category_id, id]);
+
+    // Format related articles
+    const formattedRelatedArticles = relatedArticles.map(related => ({
+      ...related,
+      created_at: related.created_at.toISOString(),
+      publishedAt: getTimeAgo(related.created_at)
+    }));
 
     // Format article
     const formattedArticle = {
@@ -259,12 +294,41 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       error: false,
-      data: formattedArticle
+      data: {
+        article: formattedArticle,
+        relatedArticles: formattedRelatedArticles
+      }
     });
   } catch (error) {
     handleRouteError(error, res, 'Get single article');
   }
 });
+
+// Helper function to get time ago
+function getTimeAgo(date) {
+  const now = new Date();
+  const past = new Date(date);
+  const diffInSeconds = Math.floor((now - past) / 1000);
+  
+  if (diffInSeconds < 60) {
+    return 'Just now';
+  } else if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds < 2592000) {
+    const days = Math.floor(diffInSeconds / 86400);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds < 31536000) {
+    const months = Math.floor(diffInSeconds / 2592000);
+    return `${months} month${months > 1 ? 's' : ''} ago`;
+  } else {
+    const years = Math.floor(diffInSeconds / 31536000);
+    return `${years} year${years > 1 ? 's' : ''} ago`;
+  }
+}
 
 // @route   POST /api/v1/articles
 // @desc    Create new article
