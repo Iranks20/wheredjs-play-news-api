@@ -25,11 +25,53 @@ router.get('/', async (req, res) => {
       order = 'DESC'
     } = req.query;
 
+    console.log('🔍 Articles API - Received query params:', req.query);
+    console.log('🔍 Articles API - Category filter:', category);
+
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Simple query without complex WHERE conditions for testing
+    // Build WHERE conditions
+    let whereConditions = [];
+    let queryParams = [];
+
+    // Add status filter
+    if (status && status !== 'all') {
+      whereConditions.push('a.status = ?');
+      queryParams.push(status);
+    }
+
+    // Add category filter
+    if (category) {
+      whereConditions.push('c.slug = ?');
+      queryParams.push(category);
+      console.log('🔍 Articles API - Added category filter for:', category);
+    }
+
+    // Add search filter
+    if (search) {
+      whereConditions.push('(a.title LIKE ? OR a.excerpt LIKE ? OR a.content LIKE ?)');
+      const searchTerm = `%${search}%`;
+      queryParams.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    // Add featured filter
+    if (featured !== undefined) {
+      whereConditions.push('a.featured = ?');
+      queryParams.push(featured === 'true' ? 1 : 0);
+    }
+
+    // Add author filter
+    if (author_id) {
+      whereConditions.push('a.author_id = ?');
+      queryParams.push(author_id);
+    }
+
+    // Build WHERE clause
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Build query
     const articlesQuery = `
       SELECT 
         a.*,
@@ -41,16 +83,29 @@ router.get('/', async (req, res) => {
       FROM articles a
       LEFT JOIN categories c ON a.category_id = c.id
       LEFT JOIN users u ON a.author_id = u.id
-      ORDER BY a.created_at DESC
+      ${whereClause}
+      ORDER BY a.${sort} ${order}
       LIMIT ${limitNum} OFFSET ${offset}
     `;
 
-    console.log('SQL Query:', articlesQuery);
-    const [articles] = await db.promise.execute(articlesQuery);
+    console.log('🔍 Articles API - Final SQL Query:', articlesQuery);
+    console.log('🔍 Articles API - Query Parameters:', queryParams);
+    
+    const [articles] = await db.promise.execute(articlesQuery, queryParams);
+    console.log('🔍 Articles API - Found articles:', articles.length);
 
-    // Get total count
-    const [countResult] = await db.promise.execute('SELECT COUNT(*) as total FROM articles');
+    // Get total count with same filters
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      ${whereClause}
+    `;
+    
+    const [countResult] = await db.promise.execute(countQuery, queryParams);
     const total = countResult[0].total;
+    console.log('🔍 Articles API - Total count:', total);
 
     // Format articles
     const formattedArticles = articles.map(article => ({
