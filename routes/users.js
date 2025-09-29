@@ -30,19 +30,16 @@ function generateSecurePassword() {
 
 // Helper function to send invitation email
 async function sendInvitationEmail(email, name, password, role) {
-  console.log('📧 Starting invitation email process...');
+
   
   try {
-    console.log('📧 Attempting to send email via Brevo...');
-    
+
     // Send email using Brevo
     const result = await sendUserInvitationEmail(email, name, password, role);
-    
-    console.log('✅ Invitation email sent successfully via Brevo:', {
+
       messageId: result.messageId,
       response: result.response
     });
-    
     return result;
   } catch (error) {
     console.error('❌ Failed to send invitation email:', error.message);
@@ -338,9 +335,9 @@ router.post('/invite', auth, authorize('editor', 'admin'), async (req, res) => {
 
     // Send invitation email
     try {
-      console.log('📧 Sending invitation email to:', email);
+
       await sendInvitationEmail(email, name, password, role);
-      console.log('✅ Invitation email sent successfully');
+
     } catch (emailError) {
       console.error('❌ Failed to send invitation email:', {
         error: emailError.message,
@@ -350,7 +347,7 @@ router.post('/invite', auth, authorize('editor', 'admin'), async (req, res) => {
       
       // Don't fail the request if email fails, but log it
       // You might want to add this to a retry queue
-      console.log('⚠️ User created but email failed. User can still login with the generated password.');
+
     }
 
     res.status(201).json({

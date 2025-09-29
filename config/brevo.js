@@ -52,7 +52,6 @@ function validateBrevoCredentials() {
     return false;
   }
   
-  console.log('✅ Brevo credentials validated successfully');
   return true;
 }
 
@@ -105,11 +104,6 @@ async function sendEmailViaBrevo(toEmail, toName, subject, htmlContent, textCont
       });
       
       res.on('end', () => {
-        console.log('📧 Brevo API Response:');
-        console.log('Status Code:', res.statusCode);
-        console.log('Response Headers:', res.headers);
-        console.log('Response Body:', data);
-        
         try {
           if (res.statusCode === 201) {
             const response = JSON.parse(data);
@@ -176,7 +170,6 @@ async function sendInvitationEmailViaBrevo(email, name, password, role) {
           <h1>🎵 Welcome to WhereDJsPlay!</h1>
           <p>Your account has been created successfully</p>
         </div>
-        
         <div class="content">
           <h2>Hello ${name},</h2>
           
@@ -239,4 +232,4 @@ module.exports = {
   validateBrevoCredentials,
   sendEmailViaBrevo,
   sendInvitationEmailViaBrevo
-};
+};

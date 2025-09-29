@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { sendAutomatedNewsletterForArticle, shouldSendAutomatedNewsletter } = require('./newsletterAutomation');
 
 /**
  * Publish scheduled articles that have reached their publish date
@@ -9,19 +10,26 @@ async function publishScheduledArticles() {
     
     // Find articles that are scheduled and have reached their publish date
     const [articles] = await db.promise.execute(`
-      SELECT id, title, publish_date 
-      FROM articles 
-      WHERE status = 'draft' 
-      AND publish_date IS NOT NULL 
-      AND publish_date <= ?
+      SELECT 
+        a.id, a.title, a.publish_date,
+        a.excerpt, a.image, a.author_id,
+        c.name as category_name,
+        c.slug as category_slug,
+        u.name as author_name
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.status = 'draft' 
+      AND a.publish_date IS NOT NULL 
+      AND a.publish_date <= ?
     `, [now]);
 
     if (articles.length === 0) {
-      console.log('No scheduled articles to publish');
+
       return;
     }
 
-    console.log(`Found ${articles.length} scheduled articles to publish`);
+
 
     // Publish each article
     for (const article of articles) {
@@ -31,13 +39,20 @@ async function publishScheduledArticles() {
           [article.id]
         );
         
-        console.log(`Published scheduled article: ${article.title} (ID: ${article.id})`);
+
+
+        // Send automated newsletter if conditions are met
+        const shouldSend = await shouldSendAutomatedNewsletter(article);
+        if (shouldSend) {
+          const newsletterResult = await sendAutomatedNewsletterForArticle(article, article.id);
+
+        }
       } catch (error) {
         console.error(`Error publishing scheduled article ${article.id}:`, error);
       }
     }
 
-    console.log(`Successfully published ${articles.length} scheduled articles`);
+
   } catch (error) {
     console.error('Error in publishScheduledArticles:', error);
   }
@@ -47,11 +62,9 @@ async function publishScheduledArticles() {
  * Start the scheduler to check for scheduled articles every minute
  */
 function startScheduler() {
-  console.log('Starting article scheduler...');
-  
+
   // Check for scheduled articles every minute
   setInterval(publishScheduledArticles, 60000); // 60 seconds
-  
   // Also check immediately on startup
   publishScheduledArticles();
 }

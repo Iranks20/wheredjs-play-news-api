@@ -120,7 +120,7 @@ router.post('/image', auth, (req, res) => {
       // Create the URL path for the optimized file
       const imageUrl = `/uploads/images/articles/${optimizedFilename}`;
       
-      console.log('Image uploaded and optimized successfully:', {
+
         filename: optimizedFilename,
         originalname: req.file.originalname,
         size: fs.statSync(optimizedPath).size,
@@ -203,7 +203,7 @@ router.post('/avatar', auth, (req, res) => {
       // Create the URL path for the optimized file
       const avatarUrl = `/uploads/images/avatars/${optimizedFilename}`;
       
-      console.log('Avatar uploaded and optimized successfully:', {
+
         filename: optimizedFilename,
         originalname: req.file.originalname,
         size: fs.statSync(optimizedPath).size,
@@ -264,7 +264,7 @@ router.delete('/image/:filename', auth, (req, res) => {
     // Delete the file
     fs.unlinkSync(filePath);
     
-    console.log('Image deleted:', filename);
+
     
     res.json({
       success: true,
@@ -298,7 +298,7 @@ router.delete('/avatar/:filename', auth, (req, res) => {
     // Delete the file
     fs.unlinkSync(filePath);
     
-    console.log('Avatar deleted:', filename);
+
     
     res.json({
       success: true,

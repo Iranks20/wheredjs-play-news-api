@@ -23,7 +23,7 @@ const getFullAvatarUrl = (avatar, req) => {
 
 // JWT Secret with fallback
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_wheredjsplay_2024_change_in_production';
-console.log('JWT_SECRET loaded:', JWT_SECRET ? 'Yes' : 'No', 'Length:', JWT_SECRET?.length);
+
 
 // @route   POST /api/v1/auth/login
 // @desc    Login user
@@ -71,7 +71,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     );
 
     // Generate JWT token
-    console.log('Generating JWT with secret:', JWT_SECRET ? 'Available' : 'Missing');
+
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,

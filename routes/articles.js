@@ -5,6 +5,7 @@ const { validate, articleSchema, articleUpdateSchema } = require('../utils/valid
 const { validateAndFormatDate } = require('../utils/datetime');
 const { handleRouteError } = require('../utils/errorHandler');
 const { validateAndProcessMedia, detectMediaType } = require('../utils/mediaUtils');
+const { sendAutomatedNewsletterForArticle, shouldSendAutomatedNewsletter } = require('../utils/newsletterAutomation');
 
 const router = express.Router();
 
@@ -25,8 +26,8 @@ router.get('/', async (req, res) => {
       order = 'DESC'
     } = req.query;
 
-    console.log('🔍 Articles API - Received query params:', req.query);
-    console.log('🔍 Articles API - Category filter:', category);
+
+
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
     if (category) {
       whereConditions.push('c.slug = ?');
       queryParams.push(category);
-      console.log('🔍 Articles API - Added category filter for:', category);
+
     }
 
     // Add search filter
@@ -88,11 +89,10 @@ router.get('/', async (req, res) => {
       LIMIT ${limitNum} OFFSET ${offset}
     `;
 
-    console.log('🔍 Articles API - Final SQL Query:', articlesQuery);
-    console.log('🔍 Articles API - Query Parameters:', queryParams);
-    
+
+
     const [articles] = await db.promise.execute(articlesQuery, queryParams);
-    console.log('🔍 Articles API - Found articles:', articles.length);
+
 
     // Get total count with same filters
     let countQuery = `
@@ -102,10 +102,9 @@ router.get('/', async (req, res) => {
       LEFT JOIN users u ON a.author_id = u.id
       ${whereClause}
     `;
-    
     const [countResult] = await db.promise.execute(countQuery, queryParams);
     const total = countResult[0].total;
-    console.log('🔍 Articles API - Total count:', total);
+
 
     // Format articles
     const formattedArticles = articles.map(article => ({
@@ -181,9 +180,9 @@ router.get('/featured', async (req, res) => {
 // @access  Public
 router.get('/breaking-news', async (req, res) => {
   try {
-    console.log('Breaking news request - query:', req.query);
+
     const limit = parseInt(req.query.limit) || 6;
-    console.log('Parsed limit:', limit, 'Type:', typeof limit);
+
 
     const [articles] = await db.promise.execute(`
       SELECT 
@@ -273,7 +272,6 @@ router.get('/:id', async (req, res) => {
 
     // Check if the parameter is a number (ID) or string (slug)
     const isNumeric = !isNaN(id) && !isNaN(parseFloat(id));
-    
     const [articles] = await db.promise.execute(`
       SELECT 
         a.*,
@@ -436,7 +434,6 @@ router.post('/', auth, authorize('author', 'editor', 'admin', 'writer'), validat
     let processedMedia = null;
     let finalMediaType = media_type;
     let finalImage = image;
-    
     if (embedded_media && embedded_media.trim()) {
       // Auto-detect media type if not specified
       if (media_type === 'image') {
@@ -488,16 +485,88 @@ router.post('/', auth, authorize('author', 'editor', 'admin', 'writer'), validat
       WHERE a.id = ?
     `, [result.insertId]);
 
+    const article = newArticle[0];
     const formattedArticle = {
-      ...newArticle[0],
-      featured: Boolean(newArticle[0].featured),
-      created_at: newArticle[0].created_at.toISOString()
+      ...article,
+      featured: Boolean(article.featured),
+      created_at: article.created_at.toISOString()
     };
+
+    // Auto-generate short link if article is published
+    let shortLinkResult = null;
+    if (status === 'published') {
+      try {
+        const shortSlug = Math.random().toString(36).substring(2, 8);
+        const fullUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/wdjpnews/article/${article.slug}`;
+        const shortLink = `${process.env.BASE_URL || 'http://localhost:3001'}/s/${shortSlug}`;
+
+        await db.promise.execute(
+          `INSERT INTO short_links (article_id, short_slug, full_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [result.insertId, shortSlug, fullUrl, 'automatic', 'share', 'auto_tracking', null, null]
+        );
+
+        shortLinkResult = {
+          success: true,
+          short_link: shortLink,
+          short_slug: shortSlug,
+          full_url: fullUrl
+        };
+
+
+      } catch (error) {
+        console.error('Failed to auto-generate short link for new article:', error);
+        shortLinkResult = { success: false, error: error.message };
+      }
+    }
+
+    // Send automated newsletter if article is created with published status
+    let newsletterResult = null;
+    if (article.status === 'published') {
+
+
+
+
+      
+      const shouldSend = await shouldSendAutomatedNewsletter(article);
+
+      
+      if (shouldSend) {
+
+
+
+        newsletterResult = await sendAutomatedNewsletterForArticle(article, result.insertId);
+        
+
+
+
+
+
+
+      } else {
+
+
+
+      }
+    }
 
     res.status(201).json({
       error: false,
       message: 'Article created successfully',
-      data: formattedArticle
+      data: formattedArticle,
+      shortLink: shortLinkResult ? {
+        success: shortLinkResult.success,
+        short_link: shortLinkResult.short_link,
+        short_slug: shortLinkResult.short_slug,
+        full_url: shortLinkResult.full_url,
+        error: shortLinkResult.error
+      } : null,
+      newsletter: newsletterResult ? {
+        sent: newsletterResult.success,
+        message: newsletterResult.message,
+        sentCount: newsletterResult.sentCount,
+        failedCount: newsletterResult.failedCount
+      } : null
     });
   } catch (error) {
     handleRouteError(error, res, 'Create article');
@@ -618,17 +687,54 @@ router.put('/:id', auth, authorize('author', 'editor', 'admin', 'writer'), valid
       WHERE a.id = ?
     `, [id]);
 
+    const article = updatedArticle[0];
     const formattedArticle = {
-      ...updatedArticle[0],
-      featured: Boolean(updatedArticle[0].featured),
-      created_at: updatedArticle[0].created_at.toISOString(),
-      updated_at: updatedArticle[0].updated_at.toISOString()
+      ...article,
+      featured: Boolean(article.featured),
+      created_at: article.created_at.toISOString(),
+      updated_at: article.updated_at.toISOString()
     };
+
+    // Send automated newsletter if article status was updated to published
+    let newsletterResult = null;
+    if (updateData.status === 'published') {
+
+
+
+
+      
+      const shouldSend = await shouldSendAutomatedNewsletter(article);
+
+      
+      if (shouldSend) {
+
+
+
+        newsletterResult = await sendAutomatedNewsletterForArticle(article, id);
+        
+
+
+
+
+
+
+      } else {
+
+
+
+      }
+    }
 
     res.json({
       error: false,
       message: 'Article updated successfully',
-      data: formattedArticle
+      data: formattedArticle,
+      newsletter: newsletterResult ? {
+        sent: newsletterResult.success,
+        message: newsletterResult.message,
+        sentCount: newsletterResult.sentCount,
+        failedCount: newsletterResult.failedCount
+      } : null
     });
   } catch (error) {
     handleRouteError(error, res, 'Update article');
@@ -715,9 +821,94 @@ router.post('/:id/publish', auth, authorize('editor', 'admin'), async (req, res)
       });
     }
 
+    // Get the full article data for newsletter automation
+    const [publishedArticle] = await db.promise.execute(`
+      SELECT 
+        a.*,
+        c.name as category_name,
+        c.slug as category_slug,
+        u.name as author_name
+      FROM articles a
+      LEFT JOIN categories c ON a.category_id = c.id
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.id = ?
+    `, [id]);
+
+    // Auto-generate short link for published article
+    let shortLinkResult = null;
+    if (publishedArticle.length > 0) {
+      try {
+        const article = publishedArticle[0];
+        const shortSlug = Math.random().toString(36).substring(2, 8);
+        const fullUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/wdjpnews/article/${article.slug}`;
+        const shortLink = `${process.env.BASE_URL || 'http://localhost:3001'}/s/${shortSlug}`;
+
+        await db.promise.execute(
+          `INSERT INTO short_links (article_id, short_slug, full_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, shortSlug, fullUrl, 'automatic', 'share', 'auto_tracking', null, null]
+        );
+
+        shortLinkResult = {
+          success: true,
+          short_link: shortLink,
+          short_slug: shortSlug,
+          full_url: fullUrl
+        };
+
+
+      } catch (error) {
+        console.error('Failed to auto-generate short link:', error);
+        shortLinkResult = { success: false, error: error.message };
+      }
+    }
+
+    // Send automated newsletter if conditions are met
+    let newsletterResult = null;
+    if (publishedArticle.length > 0) {
+
+
+
+
+      
+      const shouldSend = await shouldSendAutomatedNewsletter(publishedArticle[0]);
+
+      
+      if (shouldSend) {
+
+
+
+        newsletterResult = await sendAutomatedNewsletterForArticle(publishedArticle[0], id);
+        
+
+
+
+
+
+
+      } else {
+
+
+
+      }
+    }
+
     res.json({
       error: false,
-      message: 'Article published successfully'
+      message: 'Article published successfully',
+      shortLink: shortLinkResult ? {
+        success: shortLinkResult.success,
+        short_link: shortLinkResult.short_link,
+        short_slug: shortLinkResult.short_slug,
+        full_url: shortLinkResult.full_url,
+        error: shortLinkResult.error
+      } : null,
+      newsletter: newsletterResult ? {
+        sent: newsletterResult.success,
+        message: newsletterResult.message,
+        sentCount: newsletterResult.sentCount,
+        failedCount: newsletterResult.failedCount
+      } : null
     });
   } catch (error) {
     console.error('Publish article error:', error);

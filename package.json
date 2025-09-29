@@ -20,6 +20,7 @@
   "author": "WhereDJsPlay",
   "license": "MIT",
   "dependencies": {
+    "axios": "^1.12.2",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
@@ -33,7 +34,7 @@
     "moment": "^2.29.4",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "mysql2": "^3.6.5",
+    "mysql2": "^3.15.1",
     "nodemailer": "^7.0.5",
     "sharp": "^0.32.6",
     "slugify": "^1.6.6"
