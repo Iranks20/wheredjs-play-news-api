@@ -139,7 +139,7 @@ router.get('/', auth, authorize('admin', 'editor'), async (req, res) => {
     );
 
     // Debug logging
-
+    console.log('Subscribers query:', {
       page: pageNum, limit: limitNum, status, search,
       offset,
       whereClause,

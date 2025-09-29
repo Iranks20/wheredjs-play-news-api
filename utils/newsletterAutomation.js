@@ -52,7 +52,7 @@ async function sendAutomatedNewsletterForArticle(article, articleId) {
     const articleData = {
       title: article.title,
       excerpt: article.excerpt || 'Read the full article to learn more...',
-      image: article.image ? `${process.env.API_URL || 'http://localhost:3001'}/uploads/${article.image}` : null,
+      image: article.image ? `${process.env.API_URL || 'http://13.60.95.22:3001'}/uploads/${article.image}` : null,
       category: article.category_name || 'News',
       author: article.author_name || 'Editor',
       publishDate: new Date(article.publish_date || article.created_at).toLocaleDateString('en-US', {

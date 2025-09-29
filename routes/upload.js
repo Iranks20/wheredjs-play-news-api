@@ -120,14 +120,6 @@ router.post('/image', auth, (req, res) => {
       // Create the URL path for the optimized file
       const imageUrl = `/uploads/images/articles/${optimizedFilename}`;
       
-
-        filename: optimizedFilename,
-        originalname: req.file.originalname,
-        size: fs.statSync(optimizedPath).size,
-        mimetype: 'image/jpeg',
-        url: imageUrl
-      });
-
       res.json({
         success: true,
         message: 'Image uploaded and optimized successfully',
@@ -202,14 +194,6 @@ router.post('/avatar', auth, (req, res) => {
       
       // Create the URL path for the optimized file
       const avatarUrl = `/uploads/images/avatars/${optimizedFilename}`;
-      
-
-        filename: optimizedFilename,
-        originalname: req.file.originalname,
-        size: fs.statSync(optimizedPath).size,
-        mimetype: 'image/jpeg',
-        url: avatarUrl
-      });
 
       res.json({
         success: true,

@@ -32,7 +32,7 @@ db.getConnection((err, connection) => {
     console.error('Database connection failed:', err);
     process.exit(1);
   }
-  // Database connected successfully
+  console.log('✅ Database connected successfully');
   connection.release();
 });
 
@@ -68,9 +68,9 @@ if (enableRateLimit) {
 
   // Apply rate limiting to API routes only
   app.use('/api/', limiter);
-  // Rate limiting enabled: 1000 requests per 15 minutes
+  console.log('🛡️ Rate limiting enabled: 1000 requests per 15 minutes');
 } else {
-  // Rate limiting disabled by default
+  console.log('✅ Rate limiting disabled by default');
 }
 
 // CORS configuration
@@ -167,10 +167,8 @@ app.use('/uploads', (req, res, next) => {
     return res.status(200).end();
   }
 
-  // Log image requests (development only)
-  if (process.env.NODE_ENV === 'development') {
-
-  }
+  // Log image requests
+  console.log('📁 Unrestricted image request:', req.method, req.url);
 
   next();
 }, express.static(path.join(__dirname, 'uploads')));
@@ -189,12 +187,9 @@ app.get('/images-unrestricted/*', (req, res) => {
   
   const fullPath = path.join(__dirname, 'uploads', actualPath);
   
-  // Alternative endpoint debugging (development only)
-  if (process.env.NODE_ENV === 'development') {
-
-
-
-  }
+  console.log('🖼️ Alternative endpoint - Requested:', requestedPath);
+  console.log('🖼️ Alternative endpoint - Actual path:', actualPath);
+  console.log('🖼️ Alternative endpoint - Full path:', fullPath);
   
   // Remove ALL security headers
   res.removeHeader('Cross-Origin-Resource-Policy');
@@ -209,10 +204,10 @@ app.get('/images-unrestricted/*', (req, res) => {
   res.header('Cache-Control', 'public, max-age=31536000');
   
   if (fs.existsSync(fullPath)) {
-
+    console.log('✅ Image found via alternative endpoint, serving:', fullPath);
     res.sendFile(fullPath);
   } else {
-
+    console.log('❌ Image not found via alternative endpoint:', fullPath);
     res.status(404).json({ 
       error: 'Image not found', 
       requestedPath,
@@ -238,7 +233,7 @@ app.use('/images', (req, res, next) => {
 
   // Log image requests in development
   if (process.env.NODE_ENV === 'development') {
-
+    console.log('📁 Public image request:', req.method, req.url);
   }
   
   next();
@@ -259,8 +254,8 @@ app.get('/image-proxy/:path(*)', (req, res) => {
   const imagePath = req.params.path;
   const fullPath = path.join(__dirname, 'uploads', imagePath);
   
-
-
+  console.log('🖼️ Proxy serving image:', imagePath);
+  console.log('🖼️ Full path:', fullPath);
   
   // Remove ALL security headers
   res.removeHeader('Cross-Origin-Resource-Policy');
@@ -275,10 +270,10 @@ app.get('/image-proxy/:path(*)', (req, res) => {
   res.header('Cache-Control', 'public, max-age=31536000');
   
   if (fs.existsSync(fullPath)) {
-
+    console.log('✅ Image found, serving via proxy without restrictions');
     res.sendFile(fullPath);
   } else {
-
+    console.log('❌ Image not found via proxy:', fullPath);
     res.status(404).json({ error: 'Image not found' });
   }
 });
@@ -288,8 +283,8 @@ app.get('/uploads/images/articles/:filename', (req, res) => {
   const filename = req.params.filename;
   const imagePath = path.join(__dirname, 'uploads/images/articles', filename);
   
-
-
+  console.log('🖼️ Serving image:', filename);
+  console.log('🖼️ Full path:', imagePath);
   
   // Remove ALL security headers
   res.removeHeader('Cross-Origin-Resource-Policy');
@@ -304,10 +299,10 @@ app.get('/uploads/images/articles/:filename', (req, res) => {
   res.header('Cache-Control', 'public, max-age=31536000');
   
   if (fs.existsSync(imagePath)) {
-
+    console.log('✅ Image found, serving without restrictions');
     res.sendFile(imagePath);
   } else {
-
+    console.log('❌ Image not found:', imagePath);
     res.status(404).json({ error: 'Image not found', path: imagePath });
   }
 });
@@ -317,8 +312,8 @@ app.get('/uploads/images/avatars/:filename', (req, res) => {
   const filename = req.params.filename;
   const imagePath = path.join(__dirname, 'uploads/images/avatars', filename);
   
-
-
+  console.log('👤 Serving avatar:', filename);
+  console.log('👤 Full path:', imagePath);
   
   // Remove ALL security headers
   res.removeHeader('Cross-Origin-Resource-Policy');
@@ -333,10 +328,10 @@ app.get('/uploads/images/avatars/:filename', (req, res) => {
   res.header('Cache-Control', 'public, max-age=31536000');
   
   if (fs.existsSync(imagePath)) {
-
+    console.log('✅ Avatar found, serving without restrictions');
     res.sendFile(imagePath);
   } else {
-
+    console.log('❌ Avatar not found:', imagePath);
     res.status(404).json({ error: 'Avatar not found', path: imagePath });
   }
 });
@@ -348,14 +343,14 @@ app.get('/test-image/:filename', (req, res) => {
   const { filename } = req.params;
   const imagePath = path.join(__dirname, 'uploads/images/articles', filename);
   
-
-
+  console.log('🧪 Testing image:', filename);
+  console.log('🧪 Full path:', imagePath);
   
   if (fs.existsSync(imagePath)) {
-
+    console.log('✅ Image found, serving...');
     res.sendFile(imagePath);
   } else {
-
+    console.log('❌ Image not found');
     res.status(404).json({
       error: true,
       message: 'Image not found',
@@ -369,14 +364,14 @@ app.get('/test-avatar/:filename', (req, res) => {
   const { filename } = req.params;
   const imagePath = path.join(__dirname, 'uploads/images/avatars', filename);
   
-
-
+  console.log('🧪 Testing avatar:', filename);
+  console.log('🧪 Full path:', imagePath);
   
   if (fs.existsSync(imagePath)) {
-
+    console.log('✅ Avatar found, serving...');
     res.sendFile(imagePath);
   } else {
-
+    console.log('❌ Avatar not found');
     res.status(404).json({
       error: true,
       message: 'Avatar not found',

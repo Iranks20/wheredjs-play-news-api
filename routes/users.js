@@ -37,10 +37,11 @@ async function sendInvitationEmail(email, name, password, role) {
     // Send email using Brevo
     const result = await sendUserInvitationEmail(email, name, password, role);
 
+    return {
+      success: true,
       messageId: result.messageId,
       response: result.response
-    });
-    return result;
+    };
   } catch (error) {
     console.error('❌ Failed to send invitation email:', error.message);
     throw new Error(`Failed to send invitation email: ${error.message}`);

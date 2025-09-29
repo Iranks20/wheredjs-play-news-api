@@ -398,11 +398,10 @@ async function sendEmail(to, template, data) {
       emailTemplate.text
     );
     
-
+    return {
+      success: true,
       messageId: result.messageId
-    });
-    
-    return result;
+    };
   } catch (error) {
     console.error('❌ Failed to send email:', error);
     throw error;

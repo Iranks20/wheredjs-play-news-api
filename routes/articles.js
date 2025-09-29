@@ -26,8 +26,8 @@ router.get('/', async (req, res) => {
       order = 'DESC'
     } = req.query;
 
-
-
+    console.log('🔍 Articles API - Received query params:', req.query);
+    console.log('🔍 Articles API - Category filter:', category);
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
     if (category) {
       whereConditions.push('c.slug = ?');
       queryParams.push(category);
-
+      console.log('🔍 Articles API - Added category filter for:', category);
     }
 
     // Add search filter
@@ -89,10 +89,11 @@ router.get('/', async (req, res) => {
       LIMIT ${limitNum} OFFSET ${offset}
     `;
 
-
-
+    console.log('🔍 Articles API - Final SQL Query:', articlesQuery);
+    console.log('🔍 Articles API - Query Parameters:', queryParams);
+    
     const [articles] = await db.promise.execute(articlesQuery, queryParams);
-
+    console.log('🔍 Articles API - Found articles:', articles.length);
 
     // Get total count with same filters
     let countQuery = `
@@ -102,9 +103,10 @@ router.get('/', async (req, res) => {
       LEFT JOIN users u ON a.author_id = u.id
       ${whereClause}
     `;
+    
     const [countResult] = await db.promise.execute(countQuery, queryParams);
     const total = countResult[0].total;
-
+    console.log('🔍 Articles API - Total count:', total);
 
     // Format articles
     const formattedArticles = articles.map(article => ({
@@ -180,9 +182,9 @@ router.get('/featured', async (req, res) => {
 // @access  Public
 router.get('/breaking-news', async (req, res) => {
   try {
-
+    console.log('Breaking news request - query:', req.query);
     const limit = parseInt(req.query.limit) || 6;
-
+    console.log('Parsed limit:', limit, 'Type:', typeof limit);
 
     const [articles] = await db.promise.execute(`
       SELECT 
@@ -272,6 +274,7 @@ router.get('/:id', async (req, res) => {
 
     // Check if the parameter is a number (ID) or string (slug)
     const isNumeric = !isNaN(id) && !isNaN(parseFloat(id));
+    
     const [articles] = await db.promise.execute(`
       SELECT 
         a.*,
@@ -434,6 +437,7 @@ router.post('/', auth, authorize('author', 'editor', 'admin', 'writer'), validat
     let processedMedia = null;
     let finalMediaType = media_type;
     let finalImage = image;
+    
     if (embedded_media && embedded_media.trim()) {
       // Auto-detect media type if not specified
       if (media_type === 'image') {
@@ -513,7 +517,7 @@ router.post('/', auth, authorize('author', 'editor', 'admin', 'writer'), validat
           full_url: fullUrl
         };
 
-
+        console.log(`🔗 Auto-generated short link for new article: ${shortLink}`);
       } catch (error) {
         console.error('Failed to auto-generate short link for new article:', error);
         shortLinkResult = { success: false, error: error.message };
@@ -523,30 +527,30 @@ router.post('/', auth, authorize('author', 'editor', 'admin', 'writer'), validat
     // Send automated newsletter if article is created with published status
     let newsletterResult = null;
     if (article.status === 'published') {
-
-
-
-
+      console.log('\n🚀 ===========================================');
+      console.log('📰 ARTICLE CREATED AS PUBLISHED - CHECKING NEWSLETTER AUTOMATION');
+      console.log(`📝 Article: "${article.title}" (ID: ${result.insertId})`);
+      console.log('🚀 ===========================================\n');
       
       const shouldSend = await shouldSendAutomatedNewsletter(article);
-
+      console.log(`🔍 Newsletter automation check: ${shouldSend ? '✅ ENABLED' : '❌ DISABLED'}`);
       
       if (shouldSend) {
-
-
-
+        console.log('\n📧 ===========================================');
+        console.log('🎯 AUTOMATED NEWSLETTER BEING SENT!');
+        console.log('📧 ===========================================\n');
         newsletterResult = await sendAutomatedNewsletterForArticle(article, result.insertId);
         
-
-
-
-
-
-
+        console.log('\n📊 ===========================================');
+        console.log('📬 NEWSLETTER AUTOMATION COMPLETED!');
+        console.log(`✅ Sent: ${newsletterResult.sentCount} emails`);
+        console.log(`❌ Failed: ${newsletterResult.failedCount} emails`);
+        console.log(`📝 Message: ${newsletterResult.message}`);
+        console.log('📊 ===========================================\n');
       } else {
-
-
-
+        console.log('\n⚠️  ===========================================');
+        console.log('🚫 NEWSLETTER AUTOMATION SKIPPED');
+        console.log('⚠️  ===========================================\n');
       }
     }
 
@@ -698,30 +702,30 @@ router.put('/:id', auth, authorize('author', 'editor', 'admin', 'writer'), valid
     // Send automated newsletter if article status was updated to published
     let newsletterResult = null;
     if (updateData.status === 'published') {
-
-
-
-
+      console.log('\n🚀 ===========================================');
+      console.log('📰 ARTICLE STATUS UPDATED TO PUBLISHED - CHECKING NEWSLETTER AUTOMATION');
+      console.log(`📝 Article: "${article.title}" (ID: ${id})`);
+      console.log('🚀 ===========================================\n');
       
       const shouldSend = await shouldSendAutomatedNewsletter(article);
-
+      console.log(`🔍 Newsletter automation check: ${shouldSend ? '✅ ENABLED' : '❌ DISABLED'}`);
       
       if (shouldSend) {
-
-
-
+        console.log('\n📧 ===========================================');
+        console.log('🎯 AUTOMATED NEWSLETTER BEING SENT!');
+        console.log('📧 ===========================================\n');
         newsletterResult = await sendAutomatedNewsletterForArticle(article, id);
         
-
-
-
-
-
-
+        console.log('\n📊 ===========================================');
+        console.log('📬 NEWSLETTER AUTOMATION COMPLETED!');
+        console.log(`✅ Sent: ${newsletterResult.sentCount} emails`);
+        console.log(`❌ Failed: ${newsletterResult.failedCount} emails`);
+        console.log(`📝 Message: ${newsletterResult.message}`);
+        console.log('📊 ===========================================\n');
       } else {
-
-
-
+        console.log('\n⚠️  ===========================================');
+        console.log('🚫 NEWSLETTER AUTOMATION SKIPPED');
+        console.log('⚠️  ===========================================\n');
       }
     }
 
@@ -856,7 +860,7 @@ router.post('/:id/publish', auth, authorize('editor', 'admin'), async (req, res)
           full_url: fullUrl
         };
 
-
+        console.log(`🔗 Auto-generated short link: ${shortLink}`);
       } catch (error) {
         console.error('Failed to auto-generate short link:', error);
         shortLinkResult = { success: false, error: error.message };
@@ -866,30 +870,30 @@ router.post('/:id/publish', auth, authorize('editor', 'admin'), async (req, res)
     // Send automated newsletter if conditions are met
     let newsletterResult = null;
     if (publishedArticle.length > 0) {
-
-
-
-
+      console.log('\n🚀 ===========================================');
+      console.log('📰 ARTICLE PUBLISHED - CHECKING NEWSLETTER AUTOMATION');
+      console.log(`📝 Article: "${publishedArticle[0].title}" (ID: ${id})`);
+      console.log('🚀 ===========================================\n');
       
       const shouldSend = await shouldSendAutomatedNewsletter(publishedArticle[0]);
-
+      console.log(`🔍 Newsletter automation check: ${shouldSend ? '✅ ENABLED' : '❌ DISABLED'}`);
       
       if (shouldSend) {
-
-
-
+        console.log('\n📧 ===========================================');
+        console.log('🎯 AUTOMATED NEWSLETTER BEING SENT!');
+        console.log('📧 ===========================================\n');
         newsletterResult = await sendAutomatedNewsletterForArticle(publishedArticle[0], id);
         
-
-
-
-
-
-
+        console.log('\n📊 ===========================================');
+        console.log('📬 NEWSLETTER AUTOMATION COMPLETED!');
+        console.log(`✅ Sent: ${newsletterResult.sentCount} emails`);
+        console.log(`❌ Failed: ${newsletterResult.failedCount} emails`);
+        console.log(`📝 Message: ${newsletterResult.message}`);
+        console.log('📊 ===========================================\n');
       } else {
-
-
-
+        console.log('\n⚠️  ===========================================');
+        console.log('🚫 NEWSLETTER AUTOMATION SKIPPED');
+        console.log('⚠️  ===========================================\n');
       }
     }
 
